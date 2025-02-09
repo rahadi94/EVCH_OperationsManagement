@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "evch-om"
+version = "0.1.0"
+description = ""
+authors = ["raminahadi <ramin.ahadi.z@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
