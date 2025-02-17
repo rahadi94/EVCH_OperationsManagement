@@ -143,38 +143,41 @@ def get_historical_prices(
 
 def get_episode_rewards(raw_output_save_path, post_fix="", sim_start_date="2019-06-03"):
     df = pd.DataFrame()
-    for i in [
-        "Dynamic-Cap-Pricing",
-        "Time-of-Use",
-        "Perfect-Info",
-        "Dynamic-Menu-Based",
-        "Dynamic-Traditional",
-    ]:
-        if i == "Dynamic-Cap-Pricing":
-            file_name = f"training_results_pricing_double_PV_p0_alpha_low.csv"
-            inner_df = pd.read_csv(raw_output_save_path + file_name)
-            inner_df.drop(columns=["Unnamed: 0"], inplace=True)
-            df[i] = inner_df["profit"].iloc[0:1000]
-        elif i == "Dynamic-Menu-Based":
-            file_name = f"training_results_pricing_double_menu_1000_50_average_power_m_200_h.csv"
-            inner_df = pd.read_csv(raw_output_save_path + file_name)
-            inner_df.drop(columns=["Unnamed: 0"], inplace=True)
-            df[i] = inner_df["profit"].iloc[0:1000]
-        elif i == "Dynamic-Traditional":
-            file_name = f"training_results_pricing_double_PV_p0_low.csv"
-            inner_df = pd.read_csv(raw_output_save_path + file_name)
-            inner_df.drop(columns=["Unnamed: 0"], inplace=True)
-            df[i] = inner_df["profit"].iloc[0:1000]
-        elif i == "Time-of-Use":
-            df[i] = 381
-        elif i == "Perfect-Info":
-            df[i] = 4270
-        elif i == "Baseline":
-            df[i] = 2320
-        df[i] = df[i].rolling(window=10).mean()
+    try:
+        for i in [
+            "Dynamic-Cap-Pricing",
+            "Time-of-Use",
+            "Perfect-Info",
+            "Dynamic-Menu-Based",
+            "Dynamic-Traditional",
+        ]:
+            if i == "Dynamic-Cap-Pricing":
+                file_name = f"training_results_pricing_double_PV_p0_alpha_low.csv"
+                inner_df = pd.read_csv(raw_output_save_path + file_name)
+                inner_df.drop(columns=["Unnamed: 0"], inplace=True)
+                df[i] = inner_df["profit"].iloc[0:1000]
+            elif i == "Dynamic-Menu-Based":
+                file_name = f"training_results_pricing_double_menu_1000_50_average_power_m_200_h.csv"
+                inner_df = pd.read_csv(raw_output_save_path + file_name)
+                inner_df.drop(columns=["Unnamed: 0"], inplace=True)
+                df[i] = inner_df["profit"].iloc[0:1000]
+            elif i == "Dynamic-Traditional":
+                file_name = f"training_results_pricing_double_PV_p0_low.csv"
+                inner_df = pd.read_csv(raw_output_save_path + file_name)
+                inner_df.drop(columns=["Unnamed: 0"], inplace=True)
+                df[i] = inner_df["profit"].iloc[0:1000]
+            elif i == "Time-of-Use":
+                df[i] = 381
+            elif i == "Perfect-Info":
+                df[i] = 4270
+            elif i == "Baseline":
+                df[i] = 2320
+            df[i] = df[i].rolling(window=10).mean()
 
-    df.fillna(method="ffill", inplace=True)
-    df = df.iloc[::20]
+        df.fillna(method="ffill", inplace=True)
+        df = df.iloc[::20]
+    except:
+        pass
     return df
 
 
@@ -310,6 +313,7 @@ def get_load_curve(
     df_out = df_out.transpose()
     df_out.reset_index(inplace=True)
     df_out.rename({"index": "sim_time"}, inplace=True, axis=1)
+    df_out["sim_time"] = df_out["sim_time"].apply(lambda x: int(x))
     df_out["total_consumption"] = df_out.sum(axis=1)
     df_out["total_load"] = df_out["total_consumption"] * 60
     df_out["sim_time"] = df_out["sim_time"].apply(lambda x: int(x))

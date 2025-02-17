@@ -154,12 +154,12 @@ def get_visuals(
         post_fix=post_fix,
     )
     #
-    plot_episodes_cumulative_rewards(
-        df_episode_rewards=df_episode_rewards,
-        palette=palette,
-        visuals_save_path=visuals_save_path,
-        post_fix="",
-    )
+    # plot_episodes_cumulative_rewards(
+    #     df_episode_rewards=df_episode_rewards,
+    #     palette=palette,
+    #     visuals_save_path=visuals_save_path,
+    #     post_fix="",
+    # )
 
 
 #######################################
@@ -927,7 +927,7 @@ def plot_full_sim_horizon_combined_load_sink_curve(
         + f"full_sim_period_combined_load_sink_curve_{Configuration.instance().pricing_agent_name}.pdf"
     )
 
-    plt.show()
+    # plt.show()
 
 
 def plot_full_sim_horizon_combined_load_sink_curve_high_peak_comparison(
@@ -1206,7 +1206,7 @@ def plot_full_sim_horizon_combined_load_source_curve(
         + "full_sim_period_combined_load_supply_curve{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 # plot avg daily load curve (box plots, differentiate by weekday, weekend)
@@ -1589,7 +1589,7 @@ def plot_historical_prices(
 
     plt.savefig(visuals_save_path + "full_sim_period_pricing{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_episodes_cumulative_rewards(

@@ -548,7 +548,7 @@ class EVCC_Sim_Model:
                 "kWh_consumption",
             ]
             # append to combined df
-            pd_cs = pd_cs.append(df)
+            pd_cs = pd.concat([pd_cs, df], ignore_index=True)
         # save combined df
         pd_cs.to_csv(
             self.raw_output_save_path

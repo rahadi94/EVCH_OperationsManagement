@@ -157,7 +157,7 @@ def get_sim_charging_requests(
     :return:
     """
 
-    sim_start_day = pd.to_datetime(sim_start_day)
+    sim_start_day = pd.Timestamp(sim_start_day)
 
     if (
         sim_start_day and sim_duration and not limit_requests_to_capa
@@ -283,7 +283,7 @@ def get_sim_charging_requests(
                             fac, parking_capacity, max_charge_rate["fast"]
                         )
                     )
-                df_out = df_out.append(parking_charging_preferences)
+                df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
         except (FileNotFoundError, PermissionError):  # compute if not in cache
             lg.warning("Sample must be computed")
             df_out = pd.DataFrame()
@@ -334,7 +334,7 @@ def get_sim_charging_requests(
                         seed=42,
                     )
                 )
-                df_out = df_out.append(parking_charging_preferences)
+                df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
             # save to pickle
             if type(max_charge_rate) == int:
                 df_out.to_pickle(
@@ -366,7 +366,7 @@ def get_sim_charging_requests(
             parking_charging_preferences["EntryDate"]
         ).apply(lambda x: x.date())
         parking_charging_preferences = parking_charging_preferences[
-            parking_charging_preferences["EntryDate"] >= sim_start_day
+            parking_charging_preferences["EntryDate"] >= sim_start_day.date()
         ]  # limit to days after start date!
         days_list = parking_charging_preferences["EntryDate"].unique()
         days_list.sort()
@@ -478,8 +478,7 @@ def get_sim_PV_load_factors(
         pv_load_factors_df = pd.read_pickle(cache_path + "pv_loads.pkl")
     except (FileNotFoundError, PermissionError):
         file = "PV_Data/pv_profiles_EU.csv"  # update this at later stage. Ideally want 5min output!
-        sim_start_day = pd.to_datetime(sim_start_day)
-
+        sim_start_day = pd.Timestamp(sim_start_day)
         pv_load_factors_df = pd.read_csv(base_path + file)
         pv_load_factors_df[time_col] = pd.to_datetime(pv_load_factors_df[time_col])
         pv_load_factors_df[time_col] = pv_load_factors_df[time_col].apply(
@@ -532,7 +531,7 @@ def get_raw_parking_data(
     NOTE: TESTED AND PASSED
     """
 
-    sim_start_day = pd.to_datetime(sim_start_day)
+    sim_start_day = pd.Timestamp(sim_start_day)
 
     file_loc = "EV_Energy_Demand_Data/Parking+Charging_Data_BLENDED_CLUSTERED_v2.csv"
     df = pd.read_csv(os.path.join(base_path, file_loc))
@@ -578,7 +577,7 @@ def get_raw_parking_data(
                 method="bfill"
             )
 
-            combined_df = combined_df.append(df_fac)
+            combined_df = pd.concat([combined_df, df_fac], ignore_index=True)
 
         combined_df["MinutesSinceLastArrival"] = combined_df[
             "TimeSinceLastEntry"
@@ -745,9 +744,7 @@ def get_load_data_target_index(
     :return:
     """
 
-    sim_start_day = pd.to_datetime(sim_start_day).replace(
-        hour=0, minute=0, second=0
-    )  # ensure set to midnight
+    sim_start_day = pd.Timestamp(sim_start_day).replace(hour=0, minute=0, second=0)  # ensure set to midnight
     num_lookback_periods_timedelta = pd.to_timedelta(
         num_lookback_periods, unit="minutes"
     )
@@ -789,7 +786,7 @@ def compute_sim_times(df, sim_start_day):
     :param sim_start_day:
     :return:
     """
-    sim_start_day = pd.to_datetime(sim_start_day)
+    sim_start_day = pd.Timestamp(sim_start_day)
     df["ExitDateTime"] = pd.to_datetime(df["ExitDateTime"])
     df["EntryDateTime"] = pd.to_datetime(df["EntryDateTime"])
 
@@ -937,7 +934,7 @@ def sample_daily_requests_up_to_capacity(
                 day_df_sampled = day_df.sample(
                     n=event_count, replace=replace, random_state=seed
                 )
-                day_df_sampled = day_df_sampled.append(carry_over_events_df)
+                day_df_sampled = pd.concat([day_df_sampled, carry_over_events_df], ignore_index=True)
 
                 # simulate occupancy over day and find max
                 ## count entries and exits per time period in separate df
@@ -1018,11 +1015,11 @@ def sample_daily_requests_up_to_capacity(
                     break  # break loop if within margin
 
             # append to out_df
-            out_df = out_df.append(day_df_sampled)
+            out_df = pd.concat([out_df, day_df_sampled], ignore_index=True)
             carry_over_events_df = out_df[out_df["ExitDate"] > day]
 
         # append facility df to final df
-        final_df = final_df.append(out_df)
+        final_df = pd.concat([final_df, out_df], ignore_index=True)
 
     return final_df
 
@@ -1073,9 +1070,9 @@ def sample_up_to_capacity_inc_proportionality_seasonality(
 
             # prep day df
             df_day = df_fac[df_fac["EntryDate"] == day]
-            df_day = df_day.append(
-                request_carried_over
-            )  # append request that remain in hub from previous day
+
+            df_day = pd.concat([df_day, request_carried_over], ignore_index=True)
+            # append request that remain in hub from previous day
 
             max_daily_occ = 0
             # print(facility_capa)
@@ -1090,9 +1087,8 @@ def sample_up_to_capacity_inc_proportionality_seasonality(
                     df_day, n=n_events, groups="ClusterName", seed=seed
                 )
                 # print("sample size:",len(sample))
-                sample = sample.append(
-                    request_carried_over
-                )  # add requests that were carries over
+                sample = pd.concat([sample, request_carried_over], ignore_index=True)
+                # add requests that were carries over
 
                 # get entry counts
                 entry_counts = (
@@ -1198,10 +1194,10 @@ def sample_up_to_capacity_inc_proportionality_seasonality(
             request_carried_over.drop(columns=["ExitDate"])
             occupancy_carried_over = len(request_carried_over)
 
-            full_period_sample = full_period_sample.append(final_day_sample)
+            full_period_sample = pd.concat([full_period_sample, final_day_sample], ignore_index=True)
             # full_period_occupancy = full_period_occupancy.append(occupancy)
 
-        output_reqs_df = output_reqs_df.append(full_period_sample)
+        output_reqs_df = pd.concat([output_reqs_df, full_period_sample], ignore_index=True)
         output_reqs_df.sort_values(by=["SiteID", "EntryDateTime"], inplace=True)
 
     return output_reqs_df
@@ -1230,7 +1226,7 @@ def sample_proportionately(df, n, groups, seed=42):
             sample = df[df[groups] == group].sample(
                 n=sample_size, replace=True, random_state=seed
             )
-        df_sampled = df_sampled.append(sample)
+        df_sampled = pd.concat([df_sampled, sample], ignore_index=True)
 
     return df_sampled
 
@@ -1300,7 +1296,7 @@ def get_scaled_true_occupancy(requests_df, agg_level=5):
         out["key"] = out.apply(lambda x: "{}_{}".format(x.facility, x.time), axis=1)
 
         # print(facility,cluster)
-        target_index = target_index.append(out)
+        target_index = pd.concat([target_index, out], ignore_index=True)
 
     # merge into occupancy df
     occupancy_df = target_index.merge(
@@ -1321,7 +1317,7 @@ def get_scaled_true_occupancy(requests_df, agg_level=5):
         out_df = occupancy_df[(occupancy_df["facility"] == facility)]
         out_df.sort_values(by="time", inplace=True, ascending=True)
         out_df["total_occupancy"] = out_df["net_occupancy_change"].cumsum()
-        occupancy_final = occupancy_final.append(out_df)
+        occupancy_final = pd.concat([occupancy_final, out_df], ignore_index=True)
 
     # times
     occupancy_final["date"] = occupancy_final["time"].apply(lambda x: x.date())
@@ -1703,7 +1699,7 @@ def get_empirical_dist_IAT(raw_pref_data):
         df["TimeSinceLastEntry"] = df["EntryDateTime"] - df["Entry_shifted"]
         df["TimeSinceLastEntry"] = df["TimeSinceLastEntry"].fillna(method="bfill")
 
-        combined_df = combined_df.append(df)
+        combined_df = pd.concat([combined_df, df], ignore_index=True)
 
     combined_df["MinutesSinceLastArrivals"] = combined_df["TimeSinceLastEntry"].apply(
         lambda td: time_delta_to_scalar_minutes(td)
@@ -1793,7 +1789,7 @@ def get_empirical_dist_AR(raw_pref_data):
         df.reset_index(inplace=True)
         df.columns = ["EntryDateHour", "SiteID"]
 
-        target_df_final = target_df_final.append(df)
+        target_df_final = pd.concat([target_df_final, df], ignore_index=True)
 
     # merge entry counts
     AR_df = target_df_final.merge(
