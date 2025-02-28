@@ -40,7 +40,7 @@ class Configuration:
         self.remove_low_request_EVs = False
         self.evaluation_after_training = True
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
-        self.pricing_mode = "ToU"  #'Discrete' ,Continuous, 'perfect_info', ToU
+        self.pricing_mode = "Continuous"  #'Discrete' ,Continuous, 'perfect_info', ToU
         mode = "capa"  # menu, capa, tra
         if mode == "menu":
             self.request_adjusting_mode = "Discrete"
@@ -79,7 +79,7 @@ class Configuration:
             energy_prices = np.append(energy_prices, np.array([power[i], prices[i]]))
         self.energy_prices = energy_prices.reshape(len(prices), 2)
         self._vehicle_configs = {}
-        self.dynamic_pricing = False
+        self.dynamic_pricing = True
 
         if mode == "tra":
             self.capacity_pricing = False
@@ -108,6 +108,12 @@ class Configuration:
         self.upper_base_parking_fee = 0.02
         self.lower_base_power = 0
         self.higher_base_power = 0
+
+        # from main file
+        self.post_fix = None
+        self.summer_end_date = None
+        self.summer_start_date = None
+        self.sim_season = None
 
     def price_function(self, fixed_term, rate_based_term, power):
         if not self.capacity_pricing:
@@ -178,6 +184,13 @@ class Configuration:
             self.peak_cost = self.peak_cost * 2
         if peak_penalty == 'h':
             self.peak_cost = self.peak_cost * 3
+
+
+    def set_parameters_from_main_file(self, parameters: dict) -> None:
+        self.post_fix = parameters['post_fix']
+        self.summer_end_date = parameters['summer_end_date']
+        self.summer_start_date = parameters['summer_start_date']
+        self.sim_season = parameters['sim_season']
 
 
 

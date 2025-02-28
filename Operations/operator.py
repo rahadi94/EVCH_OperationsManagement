@@ -1,5 +1,3 @@
-import random
-
 import simpy
 from Environment.helper.configuration.configuration import Configuration
 import Operations.ChargingAlgorithms as charge_algos
@@ -9,10 +7,9 @@ import Operations.StorageAlgorithms as store_algos
 from Environment.log import lg
 import numpy as np
 import pandas as pd
-import math
 
 from Operations.NonLinearAlgorithms import nonlinear_pricing
-from rl_pricing_env import convert_to_vector
+from Utilities.RL_environments.rl_pricing_env import convert_to_vector
 
 
 class Operator:  # we also need a class for normal vehicles!!!

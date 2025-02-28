@@ -2,7 +2,7 @@ import random
 from docplex.mp.model import Model
 from datetime import datetime
 import pandas as pd
-from data import data_preparation
+from Utilities.data_for_GA_algorithms import data_preparation
 from log import lg
 import numpy as np
 

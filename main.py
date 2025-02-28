@@ -126,8 +126,12 @@ CHARGER_COSTS_FAST_FOUR = [x + CONNECTOR_COST_FAST * 3 for x in CHARGER_COSTS_FA
 
 for i in range(1, len(ELECTRICITY_TARIFF)):
     ELECTRICITY_TARIFF[i] = float(ELECTRICITY_TARIFF[i])
-
-
+parameters = {}
+parameters['post_fix'] = POST_FIX
+parameters['summer_end_date'] = SUMMER_END
+parameters['summer_start_date'] = SUMMER_START
+parameters['sim_season'] = SIM_SEASON
+Configuration.instance().set_parameters_from_main_file(parameters)
 def get_cost(costs, year, horizon=5):
     if year == "single_period":
         final_cost = 0
@@ -301,5 +305,48 @@ def run_single_simulation(
     output.columns = ["profit", "SQ", "energy_charged", "energy_canceled"]
     return output
 
+def run_experiments():
+    number_of_chargers = 200
+    PV_CAPA = Configuration.instance().PV
+    STORAGE_CAPA = 0
+    max_cap = 50
+    max_grid_usage = 2000
+    TRANSFORMER_NUM = Configuration.instance().grid
+    START = sample_week(
+        sim_seasons=SIM_SEASON,
+        summer_start=SUMMER_START,
+        summer_end=SUMMER_END,
+        seed=42,
+    )
+    print(START)
+    # week = random.sample(TRAIN_WEEKS, 1)
+    # week = START
+    results = None
+    # results = [f"{POST_FIX}", f"state{9}", f"week{1}"]
+    chargers = {
+        "fast_one": number_of_chargers,
+        "fast_two": 0,
+        "fast_four": 0,
+        "slow_one": 0,
+        "slow_two": 0,
+        "slow_four": 0,
+    }
 
-run_single_simulation()
+
+    df = run_single_simulation(
+        charging_agent=None,
+        storage_agent=None,
+        pricing_agent=None,
+        num_charger=chargers,
+        turn_off_monitoring=False,
+        turn_on_results=results,
+        turn_on_plotting=True,
+        transformer_num=TRANSFORMER_NUM,
+        storage_capa=STORAGE_CAPA,
+        pv_capa=PV_CAPA,
+        year=9,
+        start_day=START,
+    )
+    return df
+
+# run_experiments()

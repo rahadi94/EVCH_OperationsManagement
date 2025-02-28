@@ -1,5 +1,3 @@
-import simpy
-
 from Environment.helper.configuration.configuration import Configuration
 from Environment.log import lg
 from Infrastructure.grid import GridCapacity
@@ -12,16 +10,9 @@ from Infrastructure.electric_storage import ElectricStorage
 import Utilities.visualization as viz
 import Utilities.sim_input_processing as prep
 
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
-    SAC,
-)
-from Environment.helper.configuration.SAC_configuration import config
-from SC_env import ChargingHubInvestmentEnv
-
 # NOTE: unit sim time is defined as 1 minute real time!
 # from Preferences.request_generator import RequestGenerator
 from Preferences.vehicle import Vehicle
-from Utilities.sim_output_processing import get_load_curve
 
 
 class EVCC_Sim_Model:
