@@ -6,18 +6,18 @@ from Environment.helper.configuration.SAC_configuration import (
     config,
     pricing_config,
 )
-from main import run_single_simulation
 from Utilities.RL_environments.rl_pricing_env import PricingEnv
 from Utilities.sim_input_processing import sample_week
 from Environment.log import lg
 import pandas as pd
 import numpy as np
 
+from run_simulation import run_single_simulation
 
-SIM_SEASON = Configuration.instance().sim_season
-SUMMER_START = Configuration.instance().summer_start_date
-SUMMER_END = Configuration.instance().summer_end_date
-POST_FIX = Configuration.instance().post_fix
+SIM_SEASON = Configuration.instance().SIM_SEASON
+SUMMER_START = Configuration.instance().SUMMER_START
+SUMMER_END = Configuration.instance().SUMMER_END
+POST_FIX = Configuration.instance().POST_FIX
 
 evaluate_after_training = Configuration.instance().evaluation_after_training
 number_of_chargers = 200
