@@ -134,6 +134,7 @@ def get_sim_charging_requests(
     n_days=False,
     day_types=["Workday", "Saturday", "Sunday"],
     limit_requests_to_capa=False,
+    data_source = 'ACN'
 ):
     """
     Combined processing and sampling routine
@@ -188,9 +189,9 @@ def get_sim_charging_requests(
                     )
                 )
         except (FileNotFoundError, PermissionError):  # compute if not in cache
-            lg.warning("Sample must be computed")
+            lg.error("Sample must be computed")
             ### Process and sample raw preference data and pre-process
-            parking_preferences = get_raw_parking_data(base_path=base_path)
+            parking_preferences = get_raw_parking_data(base_path=base_path, data_source=data_source)
             ### Select subset of facilities in scope (can be just 1)
             parking_preferences = select_facilities(
                 df=parking_preferences, facility_names=facility_list
@@ -285,11 +286,13 @@ def get_sim_charging_requests(
                     )
                 df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
         except (FileNotFoundError, PermissionError):  # compute if not in cache
+            summer_start_date = summer_start_date.date()
+            summer_end_date = summer_end_date.date()
             lg.warning("Sample must be computed")
             df_out = pd.DataFrame()
             for fac in facility_list:
                 ### Process and sample raw preference data and pre-process
-                parking_preferences = get_raw_parking_data(base_path=base_path)
+                parking_preferences = get_raw_parking_data(base_path=base_path, data_source=data_source)
                 ### Select subset of facilities in scope (can be just 1)
                 parking_preferences = select_facilities(
                     df=parking_preferences, facility_names=[fac]
@@ -522,7 +525,7 @@ def get_sim_PV_load_factors(
 
 
 def get_raw_parking_data(
-    base_path, sim_start_day="2019-06-03", inter_arrival_time=False
+    base_path, sim_start_day="2019-06-03", inter_arrival_time=False, data_source='ARKINVEST'
 ):
     """
     Load and return pre-processed preference data as DataFrame object
@@ -532,25 +535,34 @@ def get_raw_parking_data(
     """
 
     sim_start_day = pd.Timestamp(sim_start_day)
+    if data_source == 'ARKINVEST':
+        file_loc = "EV_Energy_Demand_Data/Parking+Charging_Data_BLENDED_CLUSTERED_v2.csv"
+        df = pd.read_csv(os.path.join(base_path, file_loc))
+        # limit parking duration to 48h (let's not do this for now!)
+        df = df[df["MinutesStay"] < 48 * 60]
 
-    file_loc = "EV_Energy_Demand_Data/Parking+Charging_Data_BLENDED_CLUSTERED_v2.csv"
-    df = pd.read_csv(os.path.join(base_path, file_loc))
+        # match facility_type
+        facility_dict = {
+            "Facility_1": "Mixed-use_Facility",
+            "Facility_2": "Hospital",
+            "Facility_3": "Mixed-use_Facility",
+            "Facility_4": "Destination_Facility",
+            "Facility_5": "Workplace_Facility",
+            "Facility_6": "Workplace_Facility",
+            "Facility_KoeBogen": "Destination_Facility",
+        }
+        df["FacilityType"] = df["SiteID"].apply(lambda facility: facility_dict[facility])
+    if data_source == "ACN":
+        file_loc = "ACN_Caltech_Charging_Data/acndata_sessions_COMBINED_API.csv"
+        df = pd.read_csv(os.path.join(base_path, file_loc))
+        df = df.rename(columns={'siteID': 'SiteID'})
+        df = df.astype({'SiteID': 'str'})
+        # limit parking duration to 48h (let's not do this for now!)
+        df = df[df["MinutesStay"] < 48 * 60]
+        #TODO: Fix it later
+        df["FacilityType"] = "Mixed-use_Facility"
 
-    # limit parking duration to 48h (let's not do this for now!)
-    df = df[df["MinutesStay"] < 48 * 60]
 
-    # match facility_type
-    facility_dict = {
-        "Facility_1": "Mixed-use_Facility",
-        "Facility_2": "Hospital",
-        "Facility_3": "Mixed-use_Facility",
-        "Facility_4": "Destination_Facility",
-        "Facility_5": "Workplace_Facility",
-        "Facility_6": "Workplace_Facility",
-        "Facility_KoeBogen": "Destination_Facility",
-    }
-
-    df["FacilityType"] = df["SiteID"].apply(lambda facility: facility_dict[facility])
 
     # ensure datetime format
     df["EntryDateTime"] = pd.to_datetime(df["EntryDateTime"])
@@ -560,6 +572,18 @@ def get_raw_parking_data(
 
     # Day Type Flag
     df["DayType"] = df["EntryDayOfWeek"].apply(lambda x: day_classifier(x))
+
+
+    if data_source == "ACN":
+        df['Year'] = df['EntryDateTime'].dt.year
+        df["RevenueAmount"] = df['userInputs_paymentRequired']
+        df['EntryHoliday_yn'] = df['EntryWeekday_yn']
+        df['userInputs_kWhPerkm'] = df['userInputs_WhPerMile'] * 1.6
+        df['userInputs_kmRequested'] = df['userInputs_milesRequested'] * 1.6
+        df['MaxFeasible_kwhRequested'] = 1000
+        df['final_kWhRequested'] = df['userInputs_kWhRequested']
+        df['ClusterNum'] = 2
+        df['ClusterName'] = 'Business'
 
     # Inter Arrival Time
     if inter_arrival_time:
@@ -648,7 +672,6 @@ def get_raw_parking_data(
             "ClusterName",
             "FacilityType",
         ]
-
         df = df[cols]
 
         return df
