@@ -40,7 +40,7 @@ class Configuration:
         self.remove_low_request_EVs = False
         self.evaluation_after_training = True
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
-        self.pricing_mode = "Continuous"  #'Discrete' ,Continuous, 'perfect_info', ToU
+        self.pricing_mode = "ToU"  #'Discrete' ,Continuous, 'perfect_info', ToU
         mode = "capa"  # menu, capa, tra
         if mode == "menu":
             self.request_adjusting_mode = "Discrete"
@@ -62,7 +62,7 @@ class Configuration:
         prices = [1, 0.2]
         power = [11, 50]
         parking_price = 0
-        price_parameters = [1.5, 0]
+        price_parameters = [0.5, 0]
         self.max_price_ToU = 1.5
         self.degree_of_power_in_price_function = 1  # Don't change this :D
         # self.pricing_agent_name = 'pricing_single_22'
@@ -79,7 +79,7 @@ class Configuration:
             energy_prices = np.append(energy_prices, np.array([power[i], prices[i]]))
         self.energy_prices = energy_prices.reshape(len(prices), 2)
         self._vehicle_configs = {}
-        self.dynamic_pricing = True
+        self.dynamic_pricing = False
 
         if mode == "tra":
             self.capacity_pricing = False

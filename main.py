@@ -237,8 +237,7 @@ def run_single_simulation(
     # calculate objective function
     model.calculate_objective_function(initial_grid_capa=400)
     lg.error(
-        f"Objective function : {model.objective_function}, critic_loss = {model.pricing_agent._critic_loss}, "
-        f"policy_loss = {model.pricing_agent._policy_loss}"
+        f"Objective function : {model.objective_function}"
     )
 
     if turn_on_results:
@@ -268,7 +267,8 @@ def run_single_simulation(
             print("Results Plotted (in {} minutes)".format(plot_time))
     if model.charging_agent:
         model.charging_agent.save_models()
-    model.pricing_agent.save_models()
+    if model.pricing_agent:
+        model.pricing_agent.save_models()
     # model.storage_agent.save_models()
     if model.charging_agent:
         lg.error(
@@ -278,16 +278,17 @@ def run_single_simulation(
             f"= {model.charging_agent.environment.total_reward['feasibility_storage']}, pricing "
             f"= {model.pricing_agent.environment.total_reward['missed']}"
         )
-    else:
+    if model.pricing_agent:
         lg.error(f"profit ={model.pricing_agent.environment.total_reward['missed']}")
     if model.charging_agent:
         model.charging_agent.environment.total_reward["missed"] = 0
         model.charging_agent.environment.total_reward["feasibility"] = 0
         model.charging_agent.environment.total_reward["feasibility_storage"] = 0
         model.charging_agent.environment.total_reward["energy"] = 0
-    model.pricing_agent.environment.total_reward["missed"] = 0
-    model.pricing_agent._critic_loss = 0
-    model.pricing_agent._policy_loss = 0
+    if model.pricing_agent:
+        model.pricing_agent.environment.total_reward["missed"] = 0
+        model.pricing_agent._critic_loss = 0
+        model.pricing_agent._policy_loss = 0
     # model.storage_agent.environment.total_reward['test'] = 0
     output = pd.DataFrame(
         [
@@ -300,3 +301,5 @@ def run_single_simulation(
     output.columns = ["profit", "SQ", "energy_charged", "energy_canceled"]
     return output
 
+
+run_single_simulation()

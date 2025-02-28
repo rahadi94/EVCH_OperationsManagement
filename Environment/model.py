@@ -228,13 +228,13 @@ class EVCC_Sim_Model:
             )
             self.charging_agent.environment.env = self.env
             self.charging_agent.reset_game()
-
         self.pricing_agent = pricing_agent
-        self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
-            self, self.env
-        )
-        self.pricing_agent.environment.env = self.env
-        self.pricing_agent.reset_game()
+        if pricing_agent:
+            self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
+                self, self.env
+            )
+            self.pricing_agent.environment.env = self.env
+            self.pricing_agent.reset_game()
 
         if storage_agent:
             self.storage_agent = storage_agent
