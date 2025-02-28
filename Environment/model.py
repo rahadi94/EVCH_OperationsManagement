@@ -99,6 +99,8 @@ class EVCC_Sim_Model:
         chargers_type="single",
     ):
 
+        self.random_demand = Configuration.instance().random_demand
+        self.data_source = Configuration.instance().data_source
         self.planning = planning
         self.objective = objective
         # path settings
@@ -167,6 +169,8 @@ class EVCC_Sim_Model:
             ev_share=self.ev_share,
             max_charge_rate=self.charging_capa,
             geography=self.geography,
+            data_source=self.data_source,
+            random_demand=self.random_demand
         )
         # self.demand_factory = None#RequestGenerator(self.env)
         self.benchmarking = Configuration.instance().benchmarking

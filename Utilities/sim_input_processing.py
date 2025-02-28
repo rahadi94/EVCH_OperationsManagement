@@ -8,10 +8,10 @@ import numpy.random
 from numpy.random import default_rng
 import sklearn
 from sklearn.neighbors import KernelDensity
-
 #######################################################################################
 ### COMBINED ROUTINES
 from Environment.log import lg
+from Utilities.generate_random_demand import generate_random_demand
 
 
 def sample_training_and_test_weeks(year=2019, seed=42):
@@ -134,7 +134,8 @@ def get_sim_charging_requests(
     n_days=False,
     day_types=["Workday", "Saturday", "Sunday"],
     limit_requests_to_capa=False,
-    data_source = 'ACN'
+    data_source = 'ACN',
+    random_demand = True
 ):
     """
     Combined processing and sampling routine
@@ -157,145 +158,60 @@ def get_sim_charging_requests(
     :param limit_requests_to_capa: boolean of whether to limit capacity or not, True if yes, False if no
     :return:
     """
-
     sim_start_day = pd.Timestamp(sim_start_day)
-
-    if (
-        sim_start_day and sim_duration and not limit_requests_to_capa
-    ):  # if some start date and sim duration is specified execute below routine
-        try:  # load data if in cache
-            print(
-                cache_path
-                + "preferences_{}_{}_{}_{}_{}.pkl".format(
-                    sim_seasons, facility_list, day_types, ev_share, max_charge_rate
-                )
-            )
-            if type(max_charge_rate) == int:
-                parking_charging_preferences = pd.read_pickle(
-                    cache_path
-                    + "preferences_{}_{}_{}_{}_{}.pkl".format(
-                        sim_seasons, facility_list, day_types, ev_share, max_charge_rate
-                    )
-                )
-            elif type(max_charge_rate) == dict:
-                parking_charging_preferences = pd.read_pickle(
-                    cache_path
-                    + "preferences_{}_{}_{}_{}_{}.pkl".format(
-                        sim_seasons,
-                        facility_list,
-                        day_types,
-                        ev_share,
-                        max_charge_rate["fast"],
-                    )
-                )
-        except (FileNotFoundError, PermissionError):  # compute if not in cache
-            lg.error("Sample must be computed")
-            ### Process and sample raw preference data and pre-process
-            parking_preferences = get_raw_parking_data(base_path=base_path, data_source=data_source)
-            ### Select subset of facilities in scope (can be just 1)
-            parking_preferences = select_facilities(
-                df=parking_preferences, facility_names=facility_list
-            )
-            #### limit to selected day types
-            parking_preferences = select_day_types(
-                df=parking_preferences, day_types=day_types
-            )
-            #### limit to season
-            parking_preferences["Season"] = parking_preferences["EntryDate"].apply(
-                lambda x: (
-                    "Summer"
-                    if x >= summer_start_date and x <= summer_end_date
-                    else "Winter"
-                )
-            )
-            parking_preferences = parking_preferences[
-                parking_preferences["Season"].isin(sim_seasons)
-            ]
-            parking_preferences.drop(columns=["Season"], inplace=True)
-
-            ### Get Charging Demand
-            parking_charging_preferences = generate_charging_demand_data(
-                parking_data=parking_preferences,
-                base_path=base_path,
-                demand_gen_approach=demand_gen_approach,
-                geography=geography,
-                ev_share=ev_share,
-                min_stay_minutes=20,
-                home_charging_share=0.8,
-                max_charge_rate=max_charge_rate,
-                seed=42,
-            )
-            ## save (full year data) to cache for faster access in future runs
-            if type(max_charge_rate) == int:
-                parking_charging_preferences.to_pickle(
-                    cache_path
-                    + "preferences_{}_{}_{}_{}_{}.pkl".format(
-                        sim_seasons, facility_list, day_types, ev_share, max_charge_rate
-                    )
-                )
-            elif type(max_charge_rate) == dict:
-                parking_charging_preferences.to_pickle(
-                    cache_path
-                    + "preferences_{}_{}_{}_{}_{}.pkl".format(
-                        sim_seasons,
-                        facility_list,
-                        day_types,
-                        ev_share,
-                        max_charge_rate["fast"],
-                    )
-                )
-
-        #### limit to selected days
-        parking_charging_preferences = parking_charging_preferences[
-            parking_charging_preferences["EntryDate"] >= sim_start_day
-        ]  # limit to days after start date!
-        days_list = parking_charging_preferences["EntryDate"].unique()
-        days_list.sort()
-        days_list = list(days_list[0:sim_duration])
-        parking_charging_preferences = parking_charging_preferences[
-            parking_charging_preferences["EntryDate"].isin(days_list) == True
-        ]  # ensure
-        # parking_preferences = parking_preferences[parking_preferences["ExitDate"].isin(days_list) == True] # remove entries that stay beyond end of sim
+    if random_demand:
+        parking_charging_preferences = generate_random_demand(sim_start_day)
+        # parking_charging_preferences = parking_charging_preferences[
+        #     parking_charging_preferences["EntryDate"] >= sim_start_day.date()
+        #     ]  # limit to days after start date!
+        # days_list = parking_charging_preferences["EntryDate"].unique()
+        # days_list.sort()
+        # days_list = list(days_list[0:sim_duration])
+        # parking_charging_preferences = parking_charging_preferences[
+        #     parking_charging_preferences["EntryDate"].isin(days_list) == True
+        #     ]  # ensure
+        # # parking_preferences = parking_preferences[parking_preferences["ExitDate"].isin(days_list) == True] # remove entries that stay beyond end of sim
 
         # compute sim times
         parking_charging_preferences = compute_sim_times(
             df=parking_charging_preferences, sim_start_day=sim_start_day
         )
-        lg.warning(
-            "Simulation will be run for the following days:",
-            parking_charging_preferences["EntryDate"].unique(),
-        )
-
-    elif sim_start_day and sim_duration and limit_requests_to_capa:
-        try:  # load data if pre-prepared!
-            df_out = pd.DataFrame()
-            for fac in facility_list:
+    else:
+        if (
+            sim_start_day and sim_duration and not limit_requests_to_capa
+        ):  # if some start date and sim duration is specified execute below routine
+            try:  # load data if in cache
+                print(
+                    cache_path
+                    + "preferences_{}_{}_{}_{}_{}.pkl".format(
+                        sim_seasons, facility_list, day_types, ev_share, max_charge_rate
+                    )
+                )
                 if type(max_charge_rate) == int:
                     parking_charging_preferences = pd.read_pickle(
                         cache_path
-                        + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
-                            fac, parking_capacity, max_charge_rate
+                        + "preferences_{}_{}_{}_{}_{}.pkl".format(
+                            sim_seasons, facility_list, day_types, ev_share, max_charge_rate
                         )
                     )
                 elif type(max_charge_rate) == dict:
                     parking_charging_preferences = pd.read_pickle(
                         cache_path
-                        + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
-                            fac, parking_capacity, max_charge_rate["fast"]
+                        + "preferences_{}_{}_{}_{}_{}.pkl".format(
+                            sim_seasons,
+                            facility_list,
+                            day_types,
+                            ev_share,
+                            max_charge_rate["fast"],
                         )
                     )
-                df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
-        except (FileNotFoundError, PermissionError):  # compute if not in cache
-            summer_start_date = summer_start_date.date()
-            summer_end_date = summer_end_date.date()
-            lg.warning("Sample must be computed")
-            df_out = pd.DataFrame()
-            for fac in facility_list:
+            except (FileNotFoundError, PermissionError):  # compute if not in cache
+                lg.error("Sample must be computed")
                 ### Process and sample raw preference data and pre-process
                 parking_preferences = get_raw_parking_data(base_path=base_path, data_source=data_source)
                 ### Select subset of facilities in scope (can be just 1)
                 parking_preferences = select_facilities(
-                    df=parking_preferences, facility_names=[fac]
+                    df=parking_preferences, facility_names=facility_list
                 )
                 #### limit to selected day types
                 parking_preferences = select_day_types(
@@ -320,80 +236,181 @@ def get_sim_charging_requests(
                     base_path=base_path,
                     demand_gen_approach=demand_gen_approach,
                     geography=geography,
-                    ev_share=1,
+                    ev_share=ev_share,
                     min_stay_minutes=20,
                     home_charging_share=0.8,
                     max_charge_rate=max_charge_rate,
                     seed=42,
                 )
+                ## save (full year data) to cache for faster access in future runs
+                if type(max_charge_rate) == int:
+                    parking_charging_preferences.to_pickle(
+                        cache_path
+                        + "preferences_{}_{}_{}_{}_{}.pkl".format(
+                            sim_seasons, facility_list, day_types, ev_share, max_charge_rate
+                        )
+                    )
+                elif type(max_charge_rate) == dict:
+                    parking_charging_preferences.to_pickle(
+                        cache_path
+                        + "preferences_{}_{}_{}_{}_{}.pkl".format(
+                            sim_seasons,
+                            facility_list,
+                            day_types,
+                            ev_share,
+                            max_charge_rate["fast"],
+                        )
+                    )
 
-                ### Sample daily events such that max_occupancy is met per each facility (OPTIONAL IF SIZE OF FACILITY IS TO BE CONTROLLED)
-                print("CHECKPOINT reached")
-                parking_charging_preferences = (
-                    sample_up_to_capacity_inc_proportionality_seasonality(
-                        df=parking_charging_preferences,
-                        facility_capa=parking_capacity,
-                        margin=0.005,
+            #### limit to selected days
+            parking_charging_preferences = parking_charging_preferences[
+                parking_charging_preferences["EntryDate"] >= sim_start_day
+            ]  # limit to days after start date!
+            days_list = parking_charging_preferences["EntryDate"].unique()
+            days_list.sort()
+            days_list = list(days_list[0:sim_duration])
+            parking_charging_preferences = parking_charging_preferences[
+                parking_charging_preferences["EntryDate"].isin(days_list) == True
+            ]  # ensure
+            # parking_preferences = parking_preferences[parking_preferences["ExitDate"].isin(days_list) == True] # remove entries that stay beyond end of sim
+
+            # compute sim times
+            parking_charging_preferences = compute_sim_times(
+                df=parking_charging_preferences, sim_start_day=sim_start_day
+            )
+            lg.warning(
+                "Simulation will be run for the following days:",
+                parking_charging_preferences["EntryDate"].unique(),
+            )
+
+        elif sim_start_day and sim_duration and limit_requests_to_capa:
+            try:  # load data if pre-prepared!
+                df_out = pd.DataFrame()
+                for fac in facility_list:
+                    if type(max_charge_rate) == int:
+                        parking_charging_preferences = pd.read_pickle(
+                            cache_path
+                            + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
+                                fac, parking_capacity, max_charge_rate
+                            )
+                        )
+                    elif type(max_charge_rate) == dict:
+                        parking_charging_preferences = pd.read_pickle(
+                            cache_path
+                            + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
+                                fac, parking_capacity, max_charge_rate["fast"]
+                            )
+                        )
+                    df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
+            except (FileNotFoundError, PermissionError):  # compute if not in cache
+                summer_start_date = summer_start_date.date()
+                summer_end_date = summer_end_date.date()
+                lg.warning("Sample must be computed")
+                df_out = pd.DataFrame()
+                for fac in facility_list:
+                    ### Process and sample raw preference data and pre-process
+                    parking_preferences = get_raw_parking_data(base_path=base_path, data_source=data_source)
+                    ### Select subset of facilities in scope (can be just 1)
+                    parking_preferences = select_facilities(
+                        df=parking_preferences, facility_names=[fac]
+                    )
+                    #### limit to selected day types
+                    parking_preferences = select_day_types(
+                        df=parking_preferences, day_types=day_types
+                    )
+                    #### limit to season
+                    parking_preferences["Season"] = parking_preferences["EntryDate"].apply(
+                        lambda x: (
+                            "Summer"
+                            if x >= summer_start_date and x <= summer_end_date
+                            else "Winter"
+                        )
+                    )
+                    parking_preferences = parking_preferences[
+                        parking_preferences["Season"].isin(sim_seasons)
+                    ]
+                    parking_preferences.drop(columns=["Season"], inplace=True)
+
+                    ### Get Charging Demand
+                    parking_charging_preferences = generate_charging_demand_data(
+                        parking_data=parking_preferences,
+                        base_path=base_path,
+                        demand_gen_approach=demand_gen_approach,
+                        geography=geography,
+                        ev_share=1,
+                        min_stay_minutes=20,
+                        home_charging_share=0.8,
+                        max_charge_rate=max_charge_rate,
                         seed=42,
                     )
-                )
-                df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
-            # save to pickle
-            if type(max_charge_rate) == int:
-                df_out.to_pickle(
-                    cache_path
-                    + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
-                        fac, parking_capacity, max_charge_rate
+
+                    ### Sample daily events such that max_occupancy is met per each facility (OPTIONAL IF SIZE OF FACILITY IS TO BE CONTROLLED)
+                    print("CHECKPOINT reached")
+                    parking_charging_preferences = (
+                        sample_up_to_capacity_inc_proportionality_seasonality(
+                            df=parking_charging_preferences,
+                            facility_capa=parking_capacity,
+                            margin=0.005,
+                            seed=42,
+                        )
                     )
-                )
-            elif type(max_charge_rate) == dict:
-                df_out.to_pickle(
-                    cache_path
-                    + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
-                        fac, parking_capacity, max_charge_rate["fast"]
+                    df_out = pd.concat([df_out, parking_charging_preferences], ignore_index=True)
+                # save to pickle
+                if type(max_charge_rate) == int:
+                    df_out.to_pickle(
+                        cache_path
+                        + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
+                            fac, parking_capacity, max_charge_rate
+                        )
                     )
-                )
+                elif type(max_charge_rate) == dict:
+                    df_out.to_pickle(
+                        cache_path
+                        + "requests_sample_{}_size_limit_{}_max_charge_rate_{}.pkl".format(
+                            fac, parking_capacity, max_charge_rate["fast"]
+                        )
+                    )
 
-        #### select EVs based on ev_share
-        parking_charging_preferences = df_out
-        parking_charging_preferences = generate_electric_vehicles_yn(
-            df=parking_charging_preferences, ev_share=ev_share, seed=42
-        )
-        parking_charging_preferences["final_kWhRequested_updated"] = (
-            parking_charging_preferences["final_kWhRequested_updated"]
-            * parking_charging_preferences["EV_yn"]
-        )
+            #### select EVs based on ev_share
+            parking_charging_preferences = df_out
+            parking_charging_preferences = generate_electric_vehicles_yn(
+                df=parking_charging_preferences, ev_share=ev_share, seed=42
+            )
+            parking_charging_preferences["final_kWhRequested_updated"] = (
+                parking_charging_preferences["final_kWhRequested_updated"]
+                * parking_charging_preferences["EV_yn"]
+            )
 
-        #### limit to selected days
-        parking_charging_preferences["EntryDate"] = pd.to_datetime(
-            parking_charging_preferences["EntryDate"]
-        ).apply(lambda x: x.date())
-        parking_charging_preferences = parking_charging_preferences[
-            parking_charging_preferences["EntryDate"] >= sim_start_day.date()
-        ]  # limit to days after start date!
-        days_list = parking_charging_preferences["EntryDate"].unique()
-        days_list.sort()
-        days_list = list(days_list[0:sim_duration])
-        parking_charging_preferences = parking_charging_preferences[
-            parking_charging_preferences["EntryDate"].isin(days_list) == True
-        ]  # ensure
-        # parking_preferences = parking_preferences[parking_preferences["ExitDate"].isin(days_list) == True] # remove entries that stay beyond end of sim
-        lg.warning(parking_charging_preferences.head(2))
-        # compute sim times
-        parking_charging_preferences = compute_sim_times(
-            df=parking_charging_preferences, sim_start_day=sim_start_day
-        )
+            #### limit to selected days
+            parking_charging_preferences["EntryDate"] = pd.to_datetime(
+                parking_charging_preferences["EntryDate"]
+            ).apply(lambda x: x.date())
+            parking_charging_preferences = parking_charging_preferences[
+                parking_charging_preferences["EntryDate"] >= sim_start_day.date()
+            ]  # limit to days after start date!
+            days_list = parking_charging_preferences["EntryDate"].unique()
+            days_list.sort()
+            days_list = list(days_list[0:sim_duration])
+            parking_charging_preferences = parking_charging_preferences[
+                parking_charging_preferences["EntryDate"].isin(days_list) == True
+            ]  # ensure
+            # parking_preferences = parking_preferences[parking_preferences["ExitDate"].isin(days_list) == True] # remove entries that stay beyond end of sim
+            lg.warning(parking_charging_preferences.head(2))
+            # compute sim times
+            parking_charging_preferences = compute_sim_times(
+                df=parking_charging_preferences, sim_start_day=sim_start_day
+            )
 
-        parking_charging_preferences.reset_index(inplace=True, drop=True)
+            parking_charging_preferences.reset_index(inplace=True, drop=True)
 
-        lg.warning(
-            "Simulation will be run for the following days:",
-            parking_charging_preferences["EntryDate"].unique(),
-        )
+            lg.warning(
+                "Simulation will be run for the following days:",
+                parking_charging_preferences["EntryDate"].unique(),
+            )
 
-    elif n_days and candidate_days and not limit_requests_to_capa:
+        elif n_days and candidate_days and not limit_requests_to_capa:
 
-        raise ValueError("Not Currently Implemented ")
+            raise ValueError("Not Currently Implemented ")
 
     return parking_charging_preferences
 

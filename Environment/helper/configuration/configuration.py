@@ -39,6 +39,8 @@ class Configuration:
         self.energy_missed_penalty = 1.1
         self.B2G = False
         self.benchmarking = True
+        self.random_demand = False
+        self.data_source = 'ACN'
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = False
@@ -83,7 +85,7 @@ class Configuration:
             energy_prices = np.append(energy_prices, np.array([power[i], prices[i]]))
         self.energy_prices = energy_prices.reshape(len(prices), 2)
         self._vehicle_configs = {}
-        self.dynamic_pricing = True
+        self.dynamic_pricing = False
 
         if mode == "tra":
             self.capacity_pricing = False
