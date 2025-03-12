@@ -228,6 +228,8 @@ class Vehicle:
             # print("charging_price", self.charging_price)
             if self.charging_price > Configuration.instance().maximum_price_taking:
                 self.energy_requested = 0
+            if np.isnan(self.energy_requested):
+                self.energy_requested = 0
             # print(f'Charging_price is {self.charging_price}, power is {charging_power}, '
             #       f'Parking_fee is {self.parking_fee}, '
             #       f'park_difference is {delta*60 - self.park_duration} '

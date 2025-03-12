@@ -38,16 +38,16 @@ class Configuration:
         self.peak_cost = 15.48 / 6 * 6
         self.energy_missed_penalty = 1.1
         self.B2G = False
-        self.benchmarking = True
+        self.benchmarking = False
         self.random_demand = False
         self.data_source = 'ACN'
         # if self.benchmarking:
         #     self.peak_cost = 0
-        self.remove_low_request_EVs = False
+        self.remove_low_request_EVs = True
         self.evaluation_after_training = True
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
         self.pricing_mode = "Continuous"  #'Discrete' ,Continuous, 'perfect_info', ToU
-        mode = "capa"  # menu, capa, tra
+        mode = "tra"  # menu, capa, tra
         if mode == "menu":
             self.request_adjusting_mode = "Discrete"
             self.pricing_mode = "Discrete"
@@ -62,7 +62,7 @@ class Configuration:
         self.peak_penalty = peak_penalty
         PV = 500
         self.PV = PV
-        grid = 50  # 2, 50
+        grid = 2  # 2, 50
         self.grid = grid
         self.pricing_agent_name = f"pricing_double_{mode}_{PV}_{grid}_{charging_algorithm}_{price_sensitivity}_{facility_size}_{peak_penalty}_post_tuning"  #'pricing_double_BL_PV', 'pricing_double_PV_p0_alpha_low', 'pricing_double_PV_discrete_low'
         prices = [1, 0.2]

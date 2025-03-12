@@ -245,7 +245,6 @@ class Operator:  # we also need a class for normal vehicles!!!
             free_capa_list_actual[0] - battery_max - battery_usage
         )
         self.free_grid_capa_predicted = free_capa_list_predicted
-
         # return free_capa_list
         # yield self.env.timeout(self.planning_period_length)
 
@@ -435,6 +434,8 @@ class Operator:  # we also need a class for normal vehicles!!!
                     )
 
             else:
+                self.get_exp_free_grid_capacity()
+                self.update_vehicles_status()
                 if self.pricing_mode == "ToU":
                     hour = int((self.env.now % 1440) / 60)
                     self.pricing_parameters[0] = (
@@ -1448,7 +1449,7 @@ class Operator:  # we also need a class for normal vehicles!!!
                         self.electricity_tariff,
                     )
                     if request.charging_power < 0:
-                        lg.info(
+                        lg.warning(
                             f"charging power of {request.id} is negative{request.charging_power}"
                             , extra={"clazz": self.__class__.__name__, "oid": ""}
                         )

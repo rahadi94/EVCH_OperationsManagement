@@ -6,7 +6,7 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] [Time %(env_time)10s] [%
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 
 lg = logging.getLogger()
-lg.setLevel(logging.INFO)
+lg.setLevel(logging.WARNING)
 
 logging.getLogger("fiona").setLevel(logging.WARNING)
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] [Time %(env_time)10s] [%(clazz)30s %(oid)3s]: %(message)s')
@@ -16,7 +16,7 @@ file_handler.setLevel(logging.ERROR)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.WARNING)
 
 lg.addHandler(file_handler)
 lg.addHandler(stream_handler)

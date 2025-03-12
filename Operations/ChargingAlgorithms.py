@@ -419,7 +419,6 @@ def average_power(
         free_grid_capacity = free_grid_capacity[
             0
         ]  # need to index 1st element since this is a myopic algo
-
     total_power_consumption = 0
 
     lg.info(
@@ -431,14 +430,19 @@ def average_power(
             vehicle.assigned_charger.power,
             vehicle.energy_requested / min(vehicle.park_duration, 100000) * 60,
         )
-        # print(f'{power},{vehicle.energy_requested},{vehicle.park_duration}')
         vehicle.charging_power = power
         total_power_consumption += power
     if total_power_consumption > free_grid_capacity:
-        for vehicle in connected_vehicles:
-            vehicle.charging_power -= (
-                total_power_consumption - free_grid_capacity
-            ) / len(connected_vehicles)
+        while total_power_consumption <= free_grid_capacity:
+            checking_sum_power = 0
+            for vehicle in connected_vehicles:
+                vehicle.charging_power = max(vehicle.charging_power - (
+                    total_power_consumption - free_grid_capacity
+                ) / len(connected_vehicles), 0)
+                checking_sum_power += vehicle.charging_power
+                if checking_sum_power == 0:
+                    break
+
 
 
 def online_myopic(
