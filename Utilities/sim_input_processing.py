@@ -205,6 +205,7 @@ def get_sim_charging_requests(
                             max_charge_rate["fast"],
                         )
                     )
+
             except (FileNotFoundError, PermissionError):  # compute if not in cache
                 lg.error("Sample must be computed")
                 ### Process and sample raw preference data and pre-process
@@ -411,6 +412,7 @@ def get_sim_charging_requests(
         elif n_days and candidate_days and not limit_requests_to_capa:
 
             raise ValueError("Not Currently Implemented ")
+        parking_charging_preferences.to_csv('Utilities/raw_output/parking_data.csv')
 
     return parking_charging_preferences
 

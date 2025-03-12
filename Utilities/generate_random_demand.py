@@ -23,7 +23,7 @@ def generate_random_demand(sim_start_day):
     np.random.seed(42)
 
     # Number of rows to generate
-    num_rows = 100
+    num_rows = 500
 
     # Identify column types
     numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()

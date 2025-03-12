@@ -23,7 +23,7 @@ def run_experiments():
     # week = random.sample(TRAIN_WEEKS, 1)
     # week = START
     results = None
-    # results = [f"{POST_FIX}", f"state{9}", f"week{1}"]
+    results = [f"{Configuration.instance().POST_FIX}", f"state{9}", f"week{1}"]
     chargers = {
         "fast_one": number_of_chargers,
         "fast_two": 0,

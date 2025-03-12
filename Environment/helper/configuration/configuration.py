@@ -116,11 +116,6 @@ class Configuration:
         self.higher_base_power = 0
 
         # from main file
-        self.post_fix = None
-        self.summer_end_date = None
-        self.summer_start_date = None
-        self.sim_season = None
-
         self.set_parameters_from_ini_file()
 
     def price_function(self, fixed_term, rate_based_term, power):

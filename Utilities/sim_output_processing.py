@@ -245,7 +245,7 @@ def get_occupancy(requests_df, agg_level=5):
                 )
 
                 # print(facility,cluster)
-                target_index = target_index.append(out)
+                target_index = pd.concat([target_index, out])
 
     # merge into occupancy df
     occupancy_df = target_index.merge(
@@ -273,8 +273,7 @@ def get_occupancy(requests_df, agg_level=5):
 
                 out_df.sort_values(by="time", inplace=True, ascending=True)
                 out_df["total_occupancy"] = out_df["net_occupancy_change"].cumsum()
-
-                occupancy_final = occupancy_final.append(out_df)
+                occupancy_final = pd.concat([occupancy_final, out_df])
 
     # times
     occupancy_final["date"] = occupancy_final["time"].apply(lambda x: x.date())

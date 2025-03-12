@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 import simpy
 from Environment.helper.configuration.configuration import Configuration
+from Environment.helper.logging.extra_default_filter import ExtraDefaultFilter
+from Environment.helper.logging.simulation_context_filter import SimulationContextFilter
 from Environment.log import lg
 from Environment.model import EVCC_Sim_Model
 from Utilities.sim_input_processing import sample_week
@@ -123,6 +125,12 @@ def run_single_simulation(
     start_day=SIM_START_DAY,
 ):
     env = simpy.Environment()  # Creating the simpy environment
+    # Inject Simulation Environment to Logger (such that we can log the env time)
+    cf = SimulationContextFilter(filter_name='add_env', extra=env)
+    edf = ExtraDefaultFilter(filter_name="add_default_value")
+    lg.addFilter(cf)
+    lg.addFilter(edf)
+
     # creating a model object
     CHARGER_COSTS = {
         "fast_one": get_cost(CHARGER_COSTS_FAST_ONE, year),
@@ -132,6 +140,8 @@ def run_single_simulation(
         "slow_two": get_cost(CHARGER_COSTS_STANDARD_TWO, year),
         "slow_four": get_cost(CHARGER_COSTS_STANDARD_FOUR, year),
     }
+
+
 
     COSTS = dict(
         charger=CHARGER_COSTS,
