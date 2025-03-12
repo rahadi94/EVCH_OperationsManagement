@@ -5,18 +5,25 @@ import logging
 import pandas as pd
 
 
-class StorageEnv(gym.Env):
+class ChargingHubInvestmentEnv(gym.Env):
     metadata = {"render.modes": ["human"]}
     reward_range = (-float("inf"), float("inf"))
     spec = None
 
     def __init__(self, config):
         # Set these in ALL subclasses
-        self.action_space = spaces.Box(low=250, high=800, shape=(1,), dtype=np.float64)
+        self.action_space = spaces.Box(
+            low=0,
+            high=config.maximum_power,
+            shape=(config.number_chargers + 1,),
+            dtype=np.float64,
+        )
+        self.action_space.low[0] = 250
+        self.action_space.high[0] = config.maximum_grid_usage
         self.observation_space = spaces.Box(
             low=0,
             high=1000000,
-            shape=(config.number_chargers * 3 + 24 + 5 + 5,),
+            shape=(config.number_chargers * 3 + 2 + 5,),
             dtype=np.float64,
         )
         self.charging_hub = None
@@ -43,19 +50,38 @@ class StorageEnv(gym.Env):
         if not env:
             hour = 0
             hour = np.array(hour)
-            hour = np.eye(24)[hour]
+            # hour = np.eye(24)[hour]
+
+            normalized_hour = hour / 24 / 4
+
+            # Map normalized hour to angle in radians
+            angle = normalized_hour * 2 * np.pi
+
+            # Encode angle using sinusoidal functions
+            sin_encoding = np.sin(angle)
+            cos_encoding = np.cos(angle)
             day = 0
             day = np.array(day)
             day = np.eye(5)[day]
         else:
-            hour = (env.now % 1440 - env.now % 60) / 60
+            hour = (
+                env.now % 1440 - env.now % charging_hub.planning_interval
+            ) / charging_hub.planning_interval
             hour = np.array(int(hour))
-            hour = np.eye(24)[hour]
+            normalized_hour = hour / 24 / (60 / charging_hub.planning_interval)
+
+            # Map normalized hour to angle in radians
+            angle = normalized_hour * 2 * np.pi
+
+            # Encode angle using sinusoidal functions
+            sin_encoding = np.sin(angle)
+            cos_encoding = np.cos(angle)
+            # hour = np.eye(24)[hour]
+
             day = (env.now - env.now % 1440) / 1440
             day = np.array(int(day))
             day = np.eye(5)[day]
-        state = np.append(state, np.array([hour]))
-        state = np.append(state, np.array([day]))
+        state = np.append(state, np.array([sin_encoding, cos_encoding]))
         if not charging_hub:
             storage_SoC = 0
             free_grid_capa = 0
@@ -101,7 +127,6 @@ class StorageEnv(gym.Env):
                     charger_state[j * 3 + 1] = vehicles[j].remaining_park_duration
                     charger_state[j * 3 + 2] = charger.id
                 state = np.append(state, charger_state)
-        # print(len(state))
         return state
 
     def step(self, action, charging_hub=None, env=None):
@@ -132,7 +157,7 @@ class StorageEnv(gym.Env):
         self.current_step = 0
         self.reward = 0
         # self.state = self.get_state()
-        pd.DataFrame(self.results).to_csv("file.csv")
+        pd.DataFrame(self.results).to_csv("../../file.csv")
         if not self.charging_hub:
             return self.get_state(None, None)
         return self.get_state(self.charging_hub, self.env)
@@ -141,20 +166,27 @@ class StorageEnv(gym.Env):
         print(self.reward)
 
     def _take_action(self, action, charging_hub, env):
-        #
-        # state = state.reshape((1, self._state_size))
-        # lg.info(f'old_state={fleet.old_state}, old_action={fleet.old_action}')
-        # lg.info(f'new_action={action}, new_state={state}, {fleet.charging_count}')
+
         reward = 0
+        penalty_ratio = 0.001
         reward -= charging_hub.reward["missed"]
+        reward -= charging_hub.reward["feasibility"] * penalty_ratio
+        # reward -= charging_hub.reward['feasibility_storage'] * penalty_ratio
 
-        charging_hub.reward["missed"] = 0
-        ### TODO add the energy rewards to reward["costs"]
-        # charging_hub.grid.energy_rewards = 0
-        charging_hub.reward["feasibility"] = 0
-        charging_hub.reward["feasibility_storage"] = 0
+        self.total_reward["missed"] -= charging_hub.reward["missed"]
+        # print(f'charging:{self.total_reward["missed"]}')
+        self.total_reward["feasibility"] -= (
+            charging_hub.reward["feasibility"] * penalty_ratio
+        )
+        # self.total_reward['feasibility_storage'] -= charging_hub.reward['feasibility_storage'] * penalty_ratio
+        self.total_reward["energy"] -= charging_hub.grid.energy_rewards * 0
 
-        return reward
+        if not charging_hub.dynamic_pricing:
+            charging_hub.reward["missed"] = 0
+            charging_hub.reward["feasibility_storage"] = 0
+            charging_hub.reward["feasibility"] = 0
+
+        return reward / 100
 
     def _next_observation(self, charging_hub, env):
         return self.get_state(charging_hub, env)

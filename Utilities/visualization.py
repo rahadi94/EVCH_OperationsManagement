@@ -21,7 +21,7 @@ def set_plotting_style(palette="mako"):
     sns.set(font="serif")
 
     # define colors
-    sns.set_palette(palette, n_colors=4)
+    # sns.set_palette(palette, n_colors=4)
     # project_even_cols = [[44 / 255, 25 / 255, 149 / 255, .75], [147 / 255, 41 / 255, 223 / 255, .75],[0 / 255, 9 / 255, 43 / 255, .75]]
 
     # Make the background white, and specify the font family
@@ -49,8 +49,8 @@ def get_visuals(
     # process required results data
     df_building_load = model.base_load
     df_PV_generation = model.non_dispatchable_generator.generation_profile_actual
-    # df_requests = proc.get_requests(raw_output_save_path=raw_output_save_path,post_fix=post_fix)
-    # df_occupancy = proc.get_occupancy(df_requests)
+    df_requests = proc.get_requests(raw_output_save_path=raw_output_save_path,post_fix=post_fix)
+    df_occupancy = proc.get_occupancy(df_requests)
     list_df_charging_load = []
     # for i in ['pricing_double', 'pricing_double_BL_PV']:
     #     list_df_charging_load.append(proc.get_load_curve(raw_output_save_path=raw_output_save_path,sim_start_date=sim_start_date,post_fix=post_fix, agent_name=i))
@@ -99,9 +99,9 @@ def get_visuals(
     ####### execute plotting routines sequentially
 
     #####preferences (i.e, inputs)
-    # plot_general_population_properties(request_data=df_requests,palette=palette,visuals_save_path=visuals_save_path, post_fix=post_fix )
-    # plot_arrival_departure(request_data=df_requests, palette=palette, visuals_save_path=visuals_save_path, post_fix=post_fix, full_version=full_version)
-    # plot_combined_flexibility_indicators(request_data=df_requests, palette=palette, full_version=full_version, visuals_save_path=visuals_save_path, post_fix=post_fix)
+    plot_general_population_properties(request_data=df_requests,palette=palette,visuals_save_path=visuals_save_path, post_fix=post_fix )
+    plot_arrival_departure(request_data=df_requests, palette=palette, visuals_save_path=visuals_save_path, post_fix=post_fix, full_version=full_version)
+    plot_combined_flexibility_indicators(request_data=df_requests, palette=palette, full_version=full_version, visuals_save_path=visuals_save_path, post_fix=post_fix)
 
     # try:
     #    plot_occupancy(occupancy_data=df_occupancy, palette=palette, visuals_save_path=visuals_save_path, post_fix=post_fix)
@@ -271,17 +271,20 @@ def plot_general_population_properties(
         ]
     )
 
-    fig.suptitle(
-        "User Composition (Total Daily Visits: $\mu = ${}, $\sigma = ${})".format(
-            round(daily_visitors_avg), round(daily_visitors_std)
-        ),
-        fontsize=14,
-    )
+    try:
+        fig.suptitle(
+            "User Composition (Total Daily Visits: $\mu = ${}, $\sigma = ${})".format(
+                round(daily_visitors_avg), round(daily_visitors_std)
+            ),
+            fontsize=14,
+        )
+    except:
+        pass
 
     plt.tight_layout()
     plt.savefig(visuals_save_path + "general_population{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_arrival_departure(
@@ -296,7 +299,7 @@ def plot_arrival_departure(
     :return:
     """
     # style and colors
-    palette = "mako",
+    palette = "mako"
     set_plotting_style(palette)
     colors = sns.color_palette(palette, n_colors=9)
     color_arrival = colors[2]
@@ -340,7 +343,7 @@ def plot_arrival_departure(
             + "arrival_departure_distributions_combined{}.pdf".format(post_fix)
         )
 
-        plt.show()
+        # plt.show()
 
     # OPTION 2:
     # prep data
@@ -399,7 +402,7 @@ def plot_arrival_departure(
         + "arrival_departure_distributions_separate{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 def plot_occupancy(
@@ -477,7 +480,7 @@ def plot_occupancy(
     plt.tight_layout()
     plt.savefig(visuals_save_path + "occupancy_full_sim{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_avg_daily_occupancy_by_tech(
@@ -524,7 +527,7 @@ def plot_avg_daily_occupancy_by_tech(
     plt.tight_layout()
     plt.savefig(visuals_save_path + "occupancy_dailyavg_by_tech{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_avg_daily_occupancy_by_parker(
@@ -561,7 +564,7 @@ def plot_avg_daily_occupancy_by_parker(
     plt.tight_layout()
     plt.savefig(out_path + "occupancy_dailyavg_by_parker{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_combined_flexibility_indicators(
@@ -683,7 +686,7 @@ def plot_combined_flexibility_indicators(
         + "flexibility_characteristics_combined{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 def plot_energy_request_distribution(
@@ -725,7 +728,7 @@ def plot_energy_request_distribution(
         + "energy_request_distributions_separate{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 def plot_stay_duration_distribution(
@@ -781,7 +784,7 @@ def plot_stay_duration_distribution(
         + "stay_duration_distributions_separate{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 def plot_laxity_distribution(
@@ -835,7 +838,7 @@ def plot_laxity_distribution(
         visuals_save_path
         + "vehicle_laxity_distributions_separate{}.pdf".format(post_fix)
     )
-    plt.show()
+    # plt.show()
 
 
 #######################################
@@ -1000,7 +1003,7 @@ def plot_full_sim_horizon_combined_load_sink_curve_high_peak_comparison(
 
     plt.savefig(visuals_save_path + f"high_peak_comparison.pdf")
 
-    plt.show()
+    # plt.show()
 
 
 def plot_full_sim_horizon_combined_load_sink_curve_all_pricing(
@@ -1078,7 +1081,7 @@ def plot_full_sim_horizon_combined_load_sink_curve_all_pricing(
 
     plt.savefig(visuals_save_path + f"benchmark_load_curve.pdf")
 
-    plt.show()
+    # plt.show()
 
 
 def plot_full_sim_horizon_charging_load_source_curve(
@@ -1133,7 +1136,7 @@ def plot_full_sim_horizon_charging_load_source_curve(
 
     plt.savefig(visuals_save_path + "full_sim_period_load_curve{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_full_sim_horizon_combined_load_source_curve(
@@ -1273,7 +1276,7 @@ def plot_avg_charging_load_curves(
     plt.tight_layout()
     plt.savefig(visuals_save_path + "avg_load_curve{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 def plot_avg_load_source_and_sink_curves(
@@ -1401,7 +1404,7 @@ def plot_avg_load_source_and_sink_curves(
         visuals_save_path + "avg_load_source_sink_curves{}.pdf".format(post_fix)
     )
 
-    plt.show()
+    # plt.show()
 
 
 # plot occupancy level per charger
@@ -1441,7 +1444,7 @@ def plot_cs_occupancy_profile(
     plt.tight_layout()
     plt.savefig(visuals_save_path + "cs_occupancy_heat_profile{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 # TODO!!!
@@ -1482,7 +1485,7 @@ def plot_cs_utilization_energy(
 
     plt.savefig(visuals_save_path + "cs_utilization_energy{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 # plot service level (check good visualization options)
@@ -1558,7 +1561,7 @@ def plot_service_level(
     plt.tight_layout()
     plt.savefig(visuals_save_path + "service_level{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 # Plot historical prices
@@ -1643,7 +1646,7 @@ def plot_episodes_cumulative_rewards(
 
     plt.savefig(visuals_save_path + "episode_rewards{}.pdf".format(post_fix))
 
-    plt.show()
+    # plt.show()
 
 
 #######################################

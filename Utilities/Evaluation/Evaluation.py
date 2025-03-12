@@ -3,23 +3,17 @@ import random
 from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.TD3 import (
     TD3,
 )
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DDQN import (
-    DDQN,
-)
 from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DQN import (
     DQN,
-)
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
-    SAC,
 )
 from Environment.log import stream_handler
 import logging
 import pandas as pd
 import numpy as np
-from RL_config_evaluation import config
+from Environment.helper.configuration.RL_config_evaluation import config
 from main import run_single_simulation, POST_FIX
 from Utilities.sim_input_processing import sample_training_and_test_weeks
-from rl_environment import ChargingHubInvestmentEnv, convert_to_vector
+from Utilities.RL_environments.rl_environment import ChargingHubInvestmentEnv, convert_to_vector
 
 TRAIN_WEEKS, TEST_WEEKS = sample_training_and_test_weeks(seed=42)
 method = "GA"

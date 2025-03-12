@@ -65,7 +65,7 @@ class ChargingHubInvestmentEnv(gym.Env):
         self.current_step = 0
         self.reward = 0
         self.state = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-        pd.DataFrame(self.results).to_csv("file.csv")
+        pd.DataFrame(self.results).to_csv("../../file.csv")
 
         return np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 

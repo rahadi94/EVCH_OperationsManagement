@@ -1,5 +1,3 @@
-import simpy
-
 from Environment.helper.configuration.configuration import Configuration
 from Environment.log import lg
 from Infrastructure.grid import GridCapacity
@@ -12,16 +10,9 @@ from Infrastructure.electric_storage import ElectricStorage
 import Utilities.visualization as viz
 import Utilities.sim_input_processing as prep
 
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
-    SAC,
-)
-from Environment.helper.configuration.SAC_configuration import config
-from SC_env import ChargingHubInvestmentEnv
-
 # NOTE: unit sim time is defined as 1 minute real time!
 # from Preferences.request_generator import RequestGenerator
 from Preferences.vehicle import Vehicle
-from Utilities.sim_output_processing import get_load_curve
 
 
 class EVCC_Sim_Model:
@@ -108,6 +99,8 @@ class EVCC_Sim_Model:
         chargers_type="single",
     ):
 
+        self.random_demand = Configuration.instance().random_demand
+        self.data_source = Configuration.instance().data_source
         self.planning = planning
         self.objective = objective
         # path settings
@@ -176,6 +169,8 @@ class EVCC_Sim_Model:
             ev_share=self.ev_share,
             max_charge_rate=self.charging_capa,
             geography=self.geography,
+            data_source=self.data_source,
+            random_demand=self.random_demand
         )
         # self.demand_factory = None#RequestGenerator(self.env)
         self.benchmarking = Configuration.instance().benchmarking
@@ -228,13 +223,13 @@ class EVCC_Sim_Model:
             )
             self.charging_agent.environment.env = self.env
             self.charging_agent.reset_game()
-
         self.pricing_agent = pricing_agent
-        self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
-            self, self.env
-        )
-        self.pricing_agent.environment.env = self.env
-        self.pricing_agent.reset_game()
+        if pricing_agent:
+            self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
+                self, self.env
+            )
+            self.pricing_agent.environment.env = self.env
+            self.pricing_agent.reset_game()
 
         if storage_agent:
             self.storage_agent = storage_agent

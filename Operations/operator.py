@@ -1,5 +1,3 @@
-import random
-
 import simpy
 from Environment.helper.configuration.configuration import Configuration
 import Operations.ChargingAlgorithms as charge_algos
@@ -9,10 +7,9 @@ import Operations.StorageAlgorithms as store_algos
 from Environment.log import lg
 import numpy as np
 import pandas as pd
-import math
 
 from Operations.NonLinearAlgorithms import nonlinear_pricing
-from rl_pricing_env import convert_to_vector
+from Utilities.RL_environments.rl_pricing_env import convert_to_vector
 
 
 class Operator:  # we also need a class for normal vehicles!!!
@@ -248,7 +245,6 @@ class Operator:  # we also need a class for normal vehicles!!!
             free_capa_list_actual[0] - battery_max - battery_usage
         )
         self.free_grid_capa_predicted = free_capa_list_predicted
-
         # return free_capa_list
         # yield self.env.timeout(self.planning_period_length)
 
@@ -438,6 +434,8 @@ class Operator:  # we also need a class for normal vehicles!!!
                     )
 
             else:
+                self.get_exp_free_grid_capacity()
+                self.update_vehicles_status()
                 if self.pricing_mode == "ToU":
                     hour = int((self.env.now % 1440) / 60)
                     self.pricing_parameters[0] = (
@@ -1339,7 +1337,8 @@ class Operator:  # we also need a class for normal vehicles!!!
         :param demand_threshold:
         :param request: object of request
         """
-        lg.info(f"Request {request.id} arrived at {self.env.now}")
+        lg.info(f"Request {request.id} arrived at {self.env.now}"
+                , extra={"clazz": self.__class__.__name__, "oid": ""})
         request.mode = "Arrived"
 
         # get charger for request
@@ -1360,7 +1359,10 @@ class Operator:  # we also need a class for normal vehicles!!!
                     request.is_assigned = True
                     request.mode = "Assigned"
                     lg.info(
-                        f"Request {request.id} (EV={request.ev}; requested charge = {request.energy_requested} kW) assigned to charging station {request.assigned_charger.id}"
+                        f"Request {request.id} (EV={request.ev}; "
+                        f"requested charge = {request.energy_requested} kW) assigned to charging station "
+                        f"{request.assigned_charger.id}"
+                        , extra={"clazz": self.__class__.__name__, "oid": ""}
                     )
                     self.arrival_event.succeed()
                     self.arrival_event = self.env.event()
@@ -1370,7 +1372,10 @@ class Operator:  # we also need a class for normal vehicles!!!
                         request.assigned_time - request.arrival_period
                     )
                     lg.info(
-                        f"Request {request.id} (EV={request.ev}; requested charge = {request.energy_requested} kW) got connected to charging station {request.assigned_charger.id}"
+                        f"Request {request.id} (EV={request.ev}; "
+                        f"requested charge = {request.energy_requested} kW) got connected to charging station "
+                        f"{request.assigned_charger.id}"
+                        , extra={"clazz": self.__class__.__name__, "oid": ""}
                     )
                     yield request.event_departure
                     # charging_station.connectors.release(charging_req)
@@ -1381,7 +1386,7 @@ class Operator:  # we also need a class for normal vehicles!!!
                     # request.assigned_charger = None
                     lg.info(
                         f"Request {request.id} got {request.energy_charged} with requested energy"
-                        f" {request.energy_requested}"
+                        f" {request.energy_requested}", extra={"clazz": self.__class__.__name__, "oid": ""}
                     )
                     charging_station.connected_vehicles.remove(request)
 
@@ -1444,8 +1449,9 @@ class Operator:  # we also need a class for normal vehicles!!!
                         self.electricity_tariff,
                     )
                     if request.charging_power < 0:
-                        lg.info(
+                        lg.warning(
                             f"charging power of {request.id} is negative{request.charging_power}"
+                            , extra={"clazz": self.__class__.__name__, "oid": ""}
                         )
                 if (
                     request.mode == "Connected"
@@ -1456,25 +1462,32 @@ class Operator:  # we also need a class for normal vehicles!!!
                     request.stop_charging_time = self.env.now
                     request.mode = "Fully_charged"
                     request.charging_power = 0
-                    lg.info(f"Request {request.id} stopped charging at {self.env.now}")
+                    lg.info(f"Request {request.id} stopped charging at {self.env.now}"
+                            , extra={"clazz": self.__class__.__name__, "oid": ""})
                     lg.info(
                         f"Request {request.id} got {request.energy_charged} with requested energy"
                         f" {request.energy_requested}"
+                        , extra={"clazz": self.__class__.__name__, "oid": ""}
                     )
                     if request.energy_charged < 0:
-                        lg.info(f"request.energy_charged is negative for {request.id}")
+                        lg.info(f"request.energy_charged is negative for {request.id}"
+                                , extra={"clazz": self.__class__.__name__, "oid": ""})
             if request.departure_period <= self.env.now:
-                lg.info(f"Request {request.id} left at {self.env.now}")
+                lg.info(f"Request {request.id} left at {self.env.now}"
+                        , extra={"clazz": self.__class__.__name__, "oid": ""})
                 # self.charging_hub.reward['missed'] += self.request_reward_computing(request)
                 if request.energy_charged < 0:
-                    lg.info(f"request.energy_charged is negative for {request.id}")
+                    lg.info(f"request.energy_charged is negative for {request.id}"
+                            , extra={"clazz": self.__class__.__name__, "oid": ""})
                 request.event_departure.succeed()
                 return
             elif self.env.now == self.sim_time - 1:
-                lg.info(f"Request {request.id} left at {self.env.now}")
+                lg.info(f"Request {request.id} left at {self.env.now}"
+                        , extra={"clazz": self.__class__.__name__, "oid": ""})
                 # self.charging_hub.reward['missed'] += self.request_reward_computing(request)
                 if request.energy_charged < 0:
-                    lg.info(f"request.energy_charged is negative for {request.id}")
+                    lg.info(f"request.energy_charged is negative for {request.id}"
+                            , extra={"clazz": self.__class__.__name__, "oid": ""})
                 request.mode = "Left"
                 request.event_departure.succeed()
                 return
