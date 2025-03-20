@@ -47,9 +47,9 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.planning_interval = planning_interval
         self.optimization_period_length = optimization_period_length
         self.num_lookahead_planning_periods = num_lookahead_planning_periods  # how many planning periods do we look ahead?
-        self.demand_threshold = 0  # min demand for serving request in kWh
+        self.demand_threshold = Configuration.instance().demand_threshold  # min demand for serving request in kWh
         self.duration_threshold = (
-            10000000  # min duration for serving request in sim periods (i.e., seconds)
+            Configuration.instance().duration_threshold  # min duration for serving request in sim periods (i.e., seconds)
         )
         self.routing_strategy = routing_strategy
         self.charging_strategy = charging_strategy

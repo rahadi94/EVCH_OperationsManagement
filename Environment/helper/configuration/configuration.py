@@ -45,6 +45,8 @@ class Configuration:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = True
         self.evaluation_after_training = True
+        self.demand_threshold = 0
+        self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
         self.pricing_mode = "Continuous"  #'Discrete' ,Continuous, 'perfect_info', ToU
         mode = "tra"  # menu, capa, tra
