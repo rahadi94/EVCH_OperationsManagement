@@ -405,8 +405,8 @@ def get_sim_charging_requests(
             parking_charging_preferences.reset_index(inplace=True, drop=True)
 
             lg.warning(
-                "Simulation will be run for the following days:",
-                parking_charging_preferences["EntryDate"].unique(),
+                f"Simulation will be run for the following days: {parking_charging_preferences["EntryDate"].unique()}"
+                , extra={"clazz": "", "oid": ""}
             )
 
         elif n_days and candidate_days and not limit_requests_to_capa:
