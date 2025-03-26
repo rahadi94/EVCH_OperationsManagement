@@ -330,61 +330,57 @@ class Operator:  # we also need a class for normal vehicles!!!
         """
         first_scheduling = False
         while True:
-            if charging_strategy == "perfect_info":
-                if first_scheduling == False:
+            if charging_strategy in ["perfect_info", "perfect_info_with_storage"]:
+                def schedule_charging(strategy):
                     self.get_exp_free_grid_capacity()
-                    connected_vehicles = [
-                        x for x in self.requests if x.mode is None and x.ev == 1
-                    ]
-                    integrate_algos.perfect_info_charging_routing(
-                        vehicles=connected_vehicles,
-                        charging_stations=self.chargers,
-                        env=self.env,
-                        grid_capacity=self.free_grid_capa_actual,
-                        electricity_cost=self.electricity_tariff,
-                        baseload=self.base_load_list,
-                        sim_time=self.sim_time,
-                        generation=self.generation_list,
-                    )
+                    connected_vehicles = [x for x in self.requests if x.mode is None and x.ev == 1]
+
+                    if strategy == "perfect_info":
+                        integrate_algos.perfect_info_charging_routing(
+                            vehicles=connected_vehicles,
+                            charging_stations=self.chargers,
+                            env=self.env,
+                            grid_capacity=self.free_grid_capa_actual,
+                            electricity_cost=self.electricity_tariff,
+                            baseload=self.base_load_list,
+                            sim_time=self.sim_time,
+                            generation=self.generation_list,
+                        )
+                    elif strategy == "perfect_info_with_storage" and connected_vehicles:
+                        integrate_algos.perfect_info_charging_routing_storage(
+                            vehicles=connected_vehicles,
+                            charging_stations=self.chargers,
+                            env=self.env,
+                            grid_capacity=self.free_grid_capa_actual,
+                            electricity_cost=self.electricity_tariff,
+                            sim_time=self.sim_time,
+                            storage=self.electric_storage,
+                            baseload=self.baseload_list,
+                        )
+
+                if not first_scheduling:
+                    schedule_charging(charging_strategy)
                     first_scheduling = True
-                hour = int((self.env.now) / 60)
+
+                hour = int((self.env.now % 1440) / 60) if charging_strategy == "perfect_info_with_storage" else int(
+                    self.env.now / 60)
+
                 for request in self.requests:
                     if request.ev == 1:
                         request.charging_power = request.charge_schedule[hour]
-                if charging_strategy == "perfect_info_with_storage":
-                    if first_scheduling == False:
-                        self.get_exp_free_grid_capacity()
-                        connected_vehicles = [
-                            x for x in self.requests if x.mode is None and x.ev == 1
-                        ]
-                        if len(connected_vehicles) > 0:
-                            integrate_algos.perfect_info_charging_routing_storage(
-                                vehicles=connected_vehicles,
-                                charging_stations=self.chargers,
-                                env=self.env,
-                                grid_capacity=self.free_grid_capa_actual,
-                                electricity_cost=self.electricity_tariff,
-                                sim_time=self.sim_time,
-                                storage=self.electric_storage,
-                                baseload=self.baseload_list,
-                            )
-                        first_scheduling = True
-                    hour = int((self.env.now % 1440) / 60)
-                    for request in self.requests:
-                        if request.ev == 1:
-                            request.charging_power = request.charge_schedule[hour]
-                    if self.storage_object.max_capacity_kWh > 0:
-                        storage_power = self.electric_storage.charge_schedule[hour]
-                        if storage_power >= 0:
-                            self.electric_storage.charge_yn = 1
-                            self.electric_storage.discharge_yn = 0
-                            self.electric_storage.discharging_power = 0
-                            self.electric_storage.charging_power = storage_power
-                        else:
-                            self.electric_storage.charge_yn = 0
-                            self.electric_storage.discharge_yn = 1
-                            self.electric_storage.discharging_power = storage_power
-                            self.electric_storage.charging_power = 0
+
+                if charging_strategy == "perfect_info_with_storage" and self.storage_object.max_capacity_kWh > 0:
+                    storage_power = self.electric_storage.charge_schedule[hour]
+                    if storage_power >= 0:
+                        self.electric_storage.charge_yn = 1
+                        self.electric_storage.discharge_yn = 0
+                        self.electric_storage.discharging_power = 0
+                        self.electric_storage.charging_power = storage_power
+                    else:
+                        self.electric_storage.charge_yn = 0
+                        self.electric_storage.discharge_yn = 1
+                        self.electric_storage.discharging_power = storage_power
+                        self.electric_storage.charging_power = 0
 
             if self.charging_hub.dynamic_pricing:
                 self.get_exp_free_grid_capacity()
@@ -418,10 +414,6 @@ class Operator:  # we also need a class for normal vehicles!!!
                         / max(self.electricity_tariff)
                         * Configuration.instance().max_price_ToU
                     )
-                    # print(self.pricing_parameters[0])
-                # for i in range(len(self.price_pairs[:,1])):
-                #     self.price_pairs[i,1] = Configuration.instance().prices[i]
-                # self.pricing_parameters[1] = 0.002 + ((23 - hour) / 600)
                 if self.pricing_mode == "perfect_info":
                     if Configuration.instance().dynamic_fix_term_pricing:
                         self.pricing_parameters[1] = self.price_schedules[1][hour]
@@ -444,11 +436,6 @@ class Operator:  # we also need a class for normal vehicles!!!
                             ).transpose(),
                         ]
                     )
-
-            # if len([x for x in self.requests if
-            #         x.mode == 'Connected']) > 0:  # only execute if there are connected vehicles
-
-            # Charging algos that DO NOT require foresight
 
             if charging_strategy == "uncontrolled":
                 connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
