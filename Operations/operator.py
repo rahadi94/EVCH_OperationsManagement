@@ -47,9 +47,9 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.planning_interval = planning_interval
         self.optimization_period_length = optimization_period_length
         self.num_lookahead_planning_periods = num_lookahead_planning_periods  # how many planning periods do we look ahead?
-        self.demand_threshold = 0  # min demand for serving request in kWh
+        self.demand_threshold = Configuration.instance().demand_threshold  # min demand for serving request in kWh
         self.duration_threshold = (
-            10000000  # min duration for serving request in sim periods (i.e., seconds)
+            Configuration.instance().duration_threshold  # min duration for serving request in sim periods (i.e., seconds)
         )
         self.routing_strategy = routing_strategy
         self.charging_strategy = charging_strategy
@@ -90,9 +90,9 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.agent_name = "PGMM"  # PGM or n_step
         self.action = np.zeros(121)
         self.storage_action = [0]
-        self.pricing_action = None
-        self.state = None
-        self.pricing_state = None
+        # self.pricing_action = None
+        # self.state = None
+        # self.pricing_state = None
         self.storage_state = None
         self.generation_min = 0
         self.peak_threshold = Configuration.instance().peak_threshold
@@ -169,7 +169,6 @@ class Operator:  # we also need a class for normal vehicles!!!
                 ]["pv_generation"]
             )
             self.generation_min = generation_min
-            # TODO: there is a bug in here--> parallel charging and storage
             battery_max = min(
                 self.electric_storage.kW_discharge_peak,
                 (
@@ -205,7 +204,6 @@ class Operator:  # we also need a class for normal vehicles!!!
             offset_period = (
                 self.num_lookback_periods
             )  # how many periods to go back for prediction, here we fix to 1 day
-            # TODO: This should be attached to peripheral_building.py object
             baseload_max_pred = max(
                 self.baseload.loc[
                     (t - offset_period) : (t - offset_period)
@@ -256,7 +254,6 @@ class Operator:  # we also need a class for normal vehicles!!!
         """
         if self.storage_object.max_energy_stored_kWh > 0:
             return
-        # max_remaining_charge = self.electric_storage.max_energy_stored_kWh - self.electric_storage.SoC
         max_remaining_discharge = (
             self.electric_storage.SoC - self.electric_storage.min_energy_stored_kWh
         )
@@ -297,50 +294,28 @@ class Operator:  # we also need a class for normal vehicles!!!
         :param routing_strategy:
         :return:
         """
-        if self.routing_strategy == "random":
-            charger = route_algos.random_charger_assignment(
+        strategy_functions = {
+            "random": route_algos.random_charger_assignment,
+            "lowest_occupancy_first": route_algos.lowest_occupancy_first_charger_assignment,
+            "fill_one_after_other": route_algos.fill_one_after_other_charger_assignment,
+            "lowest_utilization_first": route_algos.lowest_utilization_first_charger_assignment,
+            "matching_supply_demand": route_algos.matching_supply_demand_level,
+            "minimum_power_requirement": route_algos.assign_to_the_minimum_power
+        }
+
+        if self.routing_strategy in strategy_functions:
+            charger = strategy_functions[self.routing_strategy](
                 charging_stations=self.chargers,
                 number_of_connectors=self.connector_num,
                 request=request,
                 demand_threshold=self.demand_threshold,
                 duration_threshold=self.duration_threshold,
             )
-        if self.routing_strategy == "lowest_occupancy_first":
-            charger = route_algos.lowest_occupancy_first_charger_assignment(
-                charging_stations=self.chargers,
-                number_of_connectors=self.connector_num,
-                request=request,
-                demand_threshold=self.demand_threshold,
-                duration_threshold=self.duration_threshold,
-            )
-        if self.routing_strategy == "fill_one_after_other":
-            charger = route_algos.fill_one_after_other_charger_assignment(
-                charging_stations=self.chargers,
-                number_of_connectors=self.connector_num,
-                request=request,
-                demand_threshold=self.demand_threshold,
-                duration_threshold=self.duration_threshold,
-            )
-        if self.routing_strategy == "lowest_utilization_first":
-            charger = route_algos.lowest_utilization_first_charger_assignment(
-                charging_stations=self.chargers,
-                number_of_connectors=self.connector_num,
-                request=request,
-                demand_threshold=self.demand_threshold,
-                duration_threshold=self.duration_threshold,
-            )
+
         if self.routing_strategy == "perfect_info":
             charger = request.assigned_charger
         if self.routing_strategy == "perfect_info_with_storage":
             charger = request.assigned_charger
-        if self.routing_strategy == "matching_supply_demand":
-            charger = route_algos.matching_supply_demand_level(
-                charging_stations=self.chargers, request=request
-            )
-        if self.routing_strategy == "minimum_power_requirement":
-            charger = route_algos.assign_to_the_minimum_power(
-                charging_stations=self.chargers, request=request
-            )
         return charger
 
     # charging
@@ -610,7 +585,7 @@ class Operator:  # we also need a class for normal vehicles!!!
 
                 self.get_exp_free_grid_capacity()
                 self.update_vehicles_status()
-                self.take_action()
+                self.take_charging_action()
                 self.conduct_charging_action()
 
                 ### active these lines if we have separate battery agent
@@ -628,17 +603,17 @@ class Operator:  # we also need a class for normal vehicles!!!
                 yield self.arrival_event
             if charging_strategy == "dynamic":
                 # if len(connected_vehicles) > 0:
-                self.update_agent()
+                self.update_charging_agent()
                 ### active these lines if we have separate battery agent
                 # self.update_storage_agent()
             if self.charging_hub.dynamic_pricing:
                 self.update_pricing_agent()
 
-    def take_action(self):
-        self.state = self.charging_hub.charging_agent.environment.get_state(
+    def take_charging_action(self):
+        state = self.charging_hub.charging_agent.environment.get_state(
             self.charging_hub, self.env
         )
-        self.charging_agent.state = self.state
+        self.charging_agent.state = state
 
         eval_ep = self.charging_agent.do_evaluation_iterations
         self.charging_agent.episode_step_number_val = 0
@@ -648,10 +623,10 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.action = self.charging_agent.action
 
     def take_pricing_action(self):
-        self.pricing_state = self.pricing_agent.environment.get_state(
+        pricing_state = self.pricing_agent.environment.get_state(
             self.charging_hub, self.env
         )
-        self.pricing_agent.state = self.pricing_state
+        self.pricing_agent.state = pricing_state
 
         eval_ep = self.pricing_agent.do_evaluation_iterations
 
@@ -666,11 +641,9 @@ class Operator:  # we also need a class for normal vehicles!!!
                     eval_ep, self.charging_hub
                 )
 
-            self.pricing_action = self.pricing_agent.action
-
             if self.pricing_agent.agent_name == "SAC":
                 rescaled_actions = self.pricing_agent.environment.rescale_action(
-                    self.pricing_action
+                    self.pricing_agent.action
                 )
                 number_of_power_options = len(self.price_pairs[:, 1])
                 final_pricing = rescaled_actions[0:number_of_power_options]
@@ -684,9 +657,9 @@ class Operator:  # we also need a class for normal vehicles!!!
                 # self.conduct_storage_action()
             if self.pricing_agent.agent_name == "DQN":
                 if len(self.price_pairs[:, 1]) > 1:
-                    vector_prices = convert_to_vector(self.pricing_action)
+                    vector_prices = convert_to_vector(self.pricing_agent.action)
                 else:
-                    vector_prices = [self.pricing_action]
+                    vector_prices = [self.pricing_agent.action]
                 final_pricing = self.pricing_agent.environment.get_final_prices_DQN(
                     vector_prices
                 )
@@ -697,9 +670,8 @@ class Operator:  # we also need a class for normal vehicles!!!
             self.pricing_agent.action = self.pricing_agent.pick_action(
                 eval_ep, self.charging_hub
             )
-            self.pricing_action = self.pricing_agent.action
             rescaled_actions = self.pricing_agent.environment.rescale_action(
-                self.pricing_action
+                self.pricing_agent.action
             )
             # self.pricing_parameters[0] = rescaled_actions[0]
             if (
@@ -834,36 +806,6 @@ class Operator:  # we also need a class for normal vehicles!!!
         # Checking storage action
         # First we ensure that the charging load is less that storage capacity and free grid power
         storage_power = 0  # self.action[0]
-        # if storage_power >= 0:
-        #     if self.storage_object.SoC + storage_power / 60 * self.charging_hub.planning_interval > \
-        #             self.storage_object.max_energy_stored_kWh:
-        #         storage_power = (
-        #                                     self.storage_object.max_energy_stored_kWh - self.storage_object.SoC) * 60 / self.charging_hub.planning_interval
-        #     storage_power = min(storage_power, self.charging_hub.operator.free_grid_capa_actual[0])
-        #
-        #     self.charging_hub.electric_storage.charge_yn = 1
-        #     self.charging_hub.electric_storage.charging_power = storage_power
-        #     self.charging_hub.electric_storage.discharge_yn = 0
-        #     self.charging_hub.electric_storage.discharging_power = 0
-        # hub_generation_kW, hub_demand_kW, max_grid_capa = self.get_hub_generation_kW(), self.get_hub_load_kW(), self.grid_capa
-        # if storage_power < 0:
-        #     if not self.B2G:
-        #         if storage_power + hub_demand_kW - hub_generation_kW < 0:
-        #             storage_power = - (hub_demand_kW - hub_generation_kW)
-        #     if self.storage_object.SoC + (storage_power / 60 * self.charging_hub.planning_interval) < 0:
-        #         storage_power = - max((self.storage_object.SoC) * 60 / self.charging_hub.planning_interval, 0)
-        #     if self.storage_object.SoC <= 0:
-        #         storage_power = 0
-        #
-        #     self.charging_hub.electric_storage.charge_yn = 0
-        #     self.charging_hub.electric_storage.charging_power = 0
-        #     self.charging_hub.electric_storage.discharge_yn = 1
-        #     self.charging_hub.electric_storage.discharging_power = - storage_power
-        # self.charging_hub.reward['feasibility_storage'] += abs(self.action[0] - storage_power)
-        # # print(self.storage_action[0], storage_power, self.electric_storage.SoC)
-        # if evaluation:
-        #     self.action[0] = storage_power
-
         all_charging_vehicles = np.asarray([])
         i = 0
         for charger in self.charging_hub.chargers:
@@ -947,17 +889,6 @@ class Operator:  # we also need a class for normal vehicles!!!
 
     def conduct_charging_action(self):
         action = self.action
-        # storage_power = action[0]
-        # if storage_power >= 0:
-        #     self.charging_hub.electric_storage.charge_yn = 1
-        #     self.charging_hub.electric_storage.charging_power = storage_power
-        #     self.charging_hub.electric_storage.discharge_yn = 0
-        #     self.charging_hub.electric_storage.discharging_power = 0
-        # elif storage_power < 0:
-        #     self.charging_hub.electric_storage.charge_yn = 0
-        #     self.charging_hub.electric_storage.charging_power = 0
-        #     self.charging_hub.electric_storage.discharge_yn = 1
-        #     self.charging_hub.electric_storage.discharging_power = - storage_power
         i = 0
         for charger in self.charging_hub.chargers:
             charging_vehicles = charger.charging_vehicles
@@ -977,7 +908,6 @@ class Operator:  # we also need a class for normal vehicles!!!
             self.charging_hub.reward["missed"] = (
                 self.reward_computing()
             )  # TODO: do we need to recalculate it?
-
         if self.pricing_agent.agent_name == "new_SAC":
             if len(self.pricing_agent.memory) > self.pricing_agent.config.batch_size:
                 # Number of updates per step in environment
@@ -1003,14 +933,14 @@ class Operator:  # we also need a class for normal vehicles!!!
                 else self.pricing_agent.done
             )
             self.pricing_agent.memory.push(
-                self.pricing_state, self.pricing_action, reward, next_state, mask
+                self.pricing_agent.state, self.pricing_agent.action, reward, next_state, mask
             )
             self.pricing_agent.state = next_state
 
         # SAC
         if self.pricing_agent.agent_name == "SAC":
             self.pricing_agent.conduct_action(
-                self.pricing_action, self.charging_hub, self.env
+                self.pricing_agent.action, self.charging_hub, self.env
             )
             eval_ep = self.pricing_agent.do_evaluation_iterations
             if self.pricing_agent.time_for_critic_and_actor_to_learn():
@@ -1028,11 +958,12 @@ class Operator:  # we also need a class for normal vehicles!!!
                 else self.pricing_agent.done
             )
             # if not eval_ep:
-            action = self.pricing_action
-            # action = self.pricing_agent.descale_action(self.pricing_action, self.charging_hub)
+            action = self.pricing_agent.action
+            # action = self.pricing_agent.descale_action(self.pricing_agent.action, self.charging_hub)
+            # print(self.pricing_state, action, self.pricing_agent.reward, self.pricing_agent.next_state)
             self.pricing_agent.save_experience(
                 experience=(
-                    self.pricing_state,
+                    self.pricing_agent.state,
                     action,
                     self.pricing_agent.reward,
                     self.pricing_agent.next_state,
@@ -1042,17 +973,17 @@ class Operator:  # we also need a class for normal vehicles!!!
 
         if self.pricing_agent.agent_name == "DQN":
             self.pricing_agent.conduct_action(
-                self.pricing_action, self.charging_hub, self.env
+                self.pricing_agent.action, self.charging_hub, self.env
             )
             if self.pricing_agent.time_for_q_network_to_learn():
                 for _ in range(
                     self.pricing_agent.hyperparameters["learning_iterations"]
                 ):
                     self.pricing_agent.learn()
-            action = self.pricing_action
+            action = self.pricing_agent.action
             self.pricing_agent.save_experience(
                 experience=(
-                    self.pricing_state,
+                    self.pricing_agent.state,
                     action,
                     self.pricing_agent.reward,
                     self.pricing_agent.next_state,
@@ -1098,7 +1029,7 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.storage_agent.global_step_number += 1
         self.storage_agent.step_counter += 1
 
-    def update_agent(self):
+    def update_charging_agent(self):
         self.update_vehicles_status()
         self.charging_hub.reward["missed"] = self.reward_computing()
 
@@ -1124,7 +1055,7 @@ class Operator:  # we also need a class for normal vehicles!!!
         action = self.charging_agent.descale_action(self.action, self.charging_hub)
         self.charging_agent.save_experience(
             experience=(
-                self.state,
+                self.charging_agent.state,
                 action,
                 self.charging_agent.reward,
                 self.charging_agent.next_state,

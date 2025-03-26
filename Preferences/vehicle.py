@@ -3,7 +3,7 @@ import numpy as np
 
 from Environment.helper.configuration.configuration import Configuration
 from Preferences.EV_user_decision_making import ev_decision_making
-
+import pandas as pd
 
 class Vehicle:
     """
@@ -48,6 +48,9 @@ class Vehicle:
         )  # energy_requested  # kWh
         self.raw_energy_demand = self.energy_requested.copy()
         self.energy_requested = min(self.energy_requested, self.park_duration / 60 * 50)
+        if pd.isna(self.energy_requested):
+            self.energy_requested = 0
+            self.raw_energy_demand = 0
         self.energy_charged = energy_charged  # kWh
         self.remaining_energy_deficit = self.energy_requested
         self.laxity = None
@@ -96,6 +99,8 @@ class Vehicle:
         self.base_power = Configuration.instance().get_base_power()
         self.request_adjusting_mode = Configuration.instance().request_adjusting_mode
         self.parking_fee = Configuration.instance().parking_price
+        if pd.isna(self.charging_price):
+            self.charging_price = 0
 
     def adjust_energy_request(self, energy_requested_input):
         """
@@ -176,22 +181,8 @@ class Vehicle:
             # print(price, power_choice, self.energy_requested, self.raw_energy_demand)
             if self.charging_price > Configuration.instance().maximum_price_taking:
                 self.energy_requested = 0
+                self.charging_price = 0
         if self.request_adjusting_mode == "Continuous":
-            # price_for_11_kW = Configuration.instance().price_function(pricing_parameters[0],
-            #                                                               pricing_parameters[1], 11)
-            # if price_for_11_kW > self.base_price or parking_fee > self.base_parking_fee:
-            #     self.energy_requested = 0
-            #     # print(price_for_11_kW, self.base_price, pricing_parameters[1])
-            # else:
-            # decisions = ev_decision_making(p_0=pricing_parameters[0], alpha=pricing_parameters[1],
-            #                                p_p=parking_fee, max_power=50,
-            #                                beta_0=self.utility_beta, beta_1=0.2,
-            #                                D=self.energy_requested, T=self.park_duration)['xvars']
-            # print(decisions, self.energy_requested, self.park_duration)
-            # raw_park_duration = self.park_duration
-            # raw_energy_requested = self.energy_requested
-            # self.energy_requested = decisions[0]
-            # self.park_duration = decisions[1]
 
             beta_parking, beta, delta, demand, p_0, alpha = (
                 self.utility_beta_parking,
@@ -220,7 +211,7 @@ class Vehicle:
                 )
             # self.departure_period = self.arrival_period + self.park_duration
             # self.parking_fee = parking_fee
-            charging_power = self.energy_requested / delta
+            charging_power = self.energy_requested / (max(delta, 1))
 
             self.charging_price = Configuration.instance().price_function(
                 p_0, alpha, charging_power
@@ -228,13 +219,13 @@ class Vehicle:
             # print("charging_price", self.charging_price)
             if self.charging_price > Configuration.instance().maximum_price_taking:
                 self.energy_requested = 0
-            if np.isnan(self.energy_requested):
-                self.energy_requested = 0
+        if pd.isna(self.energy_requested):
+            self.energy_requested = 0
+            self.charging_price = 0
             # print(f'Charging_price is {self.charging_price}, power is {charging_power}, '
             #       f'Parking_fee is {self.parking_fee}, '
             #       f'park_difference is {delta*60 - self.park_duration} '
             #       f'energy_difference is {demand - self.energy_requested}')
-
     def energy_demand_utility_function(self, price, point, raw_demand, parking_fee):
         energy_requested = min(point * self.park_duration / 60, raw_demand)
         # print("Energy requested: ", energy_requested, point, self.park_duration)

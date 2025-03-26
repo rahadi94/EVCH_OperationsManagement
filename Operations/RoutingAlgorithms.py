@@ -137,8 +137,7 @@ def lowest_utilization_first_charger_assignment(
     number_of_connectors,
     request,
     demand_threshold=1,
-    duration_threshold=24 * 60,
-):
+    duration_threshold=24 * 60):
     """
     Lowest Utilization Highest Priority (LUHP) charger assignment algorithm.
     :param number_of_connectors:
@@ -174,7 +173,11 @@ def lowest_utilization_first_charger_assignment(
     return charging_station
 
 
-def matching_supply_demand_level(charging_stations, request):
+def matching_supply_demand_level(charging_stations,
+    number_of_connectors,
+    request,
+    demand_threshold=1,
+    duration_threshold=24 * 60):
     available_CSs = [
         x for x in charging_stations if x.connectors.count < x.number_of_connectors
     ]
@@ -212,7 +215,11 @@ def matching_supply_demand_level(charging_stations, request):
         return None
 
 
-def assign_to_the_minimum_power(charging_stations, request, demand_threshold=1):
+def assign_to_the_minimum_power(charging_stations,
+    number_of_connectors,
+    request,
+    demand_threshold=1,
+    duration_threshold=24 * 60):
     available_CSs = [
         x for x in charging_stations if x.connectors.count < x.number_of_connectors
     ]

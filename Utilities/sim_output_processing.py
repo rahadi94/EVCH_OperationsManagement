@@ -307,13 +307,12 @@ def get_load_curve(
     df_out = df[df["info"] == "kWh_consumption"]
     df_out.drop(["cs_id", "info"], inplace=True, axis=1)
     df_out.reset_index(inplace=True, drop=True)
-
     # transpose (to get time as index)
     df_out = df_out.transpose()
     df_out.reset_index(inplace=True)
     df_out.rename({"index": "sim_time"}, inplace=True, axis=1)
     df_out["sim_time"] = df_out["sim_time"].apply(lambda x: int(x))
-    df_out["total_consumption"] = df_out.sum(axis=1)
+    df_out["total_consumption"] = df_out.drop('sim_time', axis=1).sum(axis=1)
     df_out["total_load"] = df_out["total_consumption"] * 60
     df_out["sim_time"] = df_out["sim_time"].apply(lambda x: int(x))
 
@@ -346,7 +345,6 @@ def get_load_curve(
     df_out["minutes_from_midnight_base5"] = df_out["minutes_from_midnight"].apply(
         lambda x: round_down_to_base(x, 5)
     )
-
     return df_out
 
 
