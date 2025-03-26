@@ -144,7 +144,7 @@ pricing_config.hyperparameters = {
         "do_evaluation_iterations": pricing_config.evaluation,
         "clip_rewards": False,
         "Actor": {
-            "learning_rate": 0.0001,
+            "learning_rate": 0.000001,
             "linear_hidden_units": [512, 256, 512],
             "final_layer_activation": "TANH",
             "batch_norm": False,
@@ -152,7 +152,7 @@ pricing_config.hyperparameters = {
             "gradient_clipping_norm": None,
         },
         "Critic": {
-            "learning_rate": 0.0001,
+            "learning_rate": 0.000001,
             "linear_hidden_units": [512, 256, 512],
             "final_layer_activation": "None",
             "batch_norm": False,

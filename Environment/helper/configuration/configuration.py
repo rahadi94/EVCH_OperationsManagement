@@ -44,12 +44,12 @@ class Configuration:
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = True
-        self.evaluation_after_training = True
+        self.evaluation_after_training = False
         self.demand_threshold = 0
         self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
         self.pricing_mode = "Continuous"  #'Discrete' ,Continuous, 'perfect_info', ToU
-        mode = "tra"  # menu, capa, tra
+        mode = "capa"  # menu, capa, tra
         if mode == "menu":
             self.request_adjusting_mode = "Discrete"
             self.pricing_mode = "Discrete"
@@ -87,7 +87,7 @@ class Configuration:
             energy_prices = np.append(energy_prices, np.array([power[i], prices[i]]))
         self.energy_prices = energy_prices.reshape(len(prices), 2)
         self._vehicle_configs = {}
-        self.dynamic_pricing = False
+        self.dynamic_pricing = True
 
         if mode == "tra":
             self.capacity_pricing = False

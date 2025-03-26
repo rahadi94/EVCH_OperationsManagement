@@ -86,7 +86,7 @@ def run_experiments():
             "slow_two": 0,
             "slow_four": 0,
         }
-        lg.error(f"episode: {episode}")
+        lg.error(f"episode: {episode}", extra={"clazz": "", "oid": ""})
         if (
             episode % evaluation_episodes == 0
             and pricing_agent.global_step_number >= time_to_learn

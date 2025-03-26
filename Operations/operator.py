@@ -977,7 +977,6 @@ class Operator:  # we also need a class for normal vehicles!!!
             self.charging_hub.reward["missed"] = (
                 self.reward_computing()
             )  # TODO: do we need to recalculate it?
-
         if self.pricing_agent.agent_name == "new_SAC":
             if len(self.pricing_agent.memory) > self.pricing_agent.config.batch_size:
                 # Number of updates per step in environment
@@ -1030,6 +1029,7 @@ class Operator:  # we also need a class for normal vehicles!!!
             # if not eval_ep:
             action = self.pricing_action
             # action = self.pricing_agent.descale_action(self.pricing_action, self.charging_hub)
+            # print(self.pricing_state, action, self.pricing_agent.reward, self.pricing_agent.next_state)
             self.pricing_agent.save_experience(
                 experience=(
                     self.pricing_state,

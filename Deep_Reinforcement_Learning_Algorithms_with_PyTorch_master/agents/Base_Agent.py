@@ -6,6 +6,7 @@ import random
 import numpy as np
 import torch
 import time
+from Environment.log import lg
 
 # import tensorflow as tf
 from nn_builder.pytorch.NN import NN
@@ -17,7 +18,7 @@ from torch.optim import optimizer
 class Base_Agent(object):
 
     def __init__(self, config):
-        self.logger = self.setup_logger()
+        self.logger = lg
         self.debug_mode = config.debug_mode
         # if self.debug_mode: self.tensorboard = SummaryWriter()
         self.config = config
@@ -223,7 +224,7 @@ class Base_Agent(object):
         self.episode_observations = []
         if "exploration_strategy" in self.__dict__.keys():
             self.exploration_strategy.reset()
-        self.logger.info("Reseting game -- New start state {}".format(self.state))
+        # self.logger.info("Reseting game -- New start state {}".format(self.state))
 
     def track_episodes_data(self):
         """Saves the data from the recent episodes"""
@@ -373,7 +374,7 @@ class Base_Agent(object):
             network = [network]
         optimizer.zero_grad()  # reset gradients to 0
         loss.backward(retain_graph=retain_graph)  # this calculates the gradients
-        self.logger.info("Loss -- {}".format(loss.item()))
+        self.logger.info(f"Loss -- {loss.item()}", extra={"clazz": "", "oid": ""})
         if self.debug_mode:
             self.log_gradient_and_weight_information(network, optimizer)
         if clipping_norm is not None:

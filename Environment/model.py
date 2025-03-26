@@ -13,7 +13,7 @@ import Utilities.sim_input_processing as prep
 # NOTE: unit sim time is defined as 1 minute real time!
 # from Preferences.request_generator import RequestGenerator
 from Preferences.vehicle import Vehicle
-
+import numpy as np
 
 class EVCC_Sim_Model:
     # There is only one instance of this class.
@@ -575,7 +575,7 @@ class EVCC_Sim_Model:
         requests = [i for i in self.requests if i.ev == 1]
 
         for request in requests:
-            energy_requested_adj = request.energy_requested * self.minimum_served_demand
+            energy_requested_adj = request.energy_requested
             if request.is_assigned:
                 if request.energy_requested > 0:
                     total_revenue += (
@@ -583,6 +583,7 @@ class EVCC_Sim_Model:
                         * request.charging_price
                     )  # overserving request does not count!
                     total_revenue += request.park_duration * request.parking_fee
+
             if self.env.now >= 1440 - 60:
                 total_revenue -= (
                     max(energy_requested_adj - request.energy_charged, 0)
@@ -598,7 +599,6 @@ class EVCC_Sim_Model:
             total_revenue -= (
                 max((request.raw_energy_demand - request.energy_requested), 0) * 0
             )
-
         # TODO: fix this
         # activate it when we have a single price
         # return (total_revenue * self.penalty_for_missed_kWh - (self.costs["operations"]))
