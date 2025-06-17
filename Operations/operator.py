@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from Operations.NonLinearAlgorithms import nonlinear_pricing
+from Operations.Operator_utils import get_exp_free_grid_capacity_utility
 from Utilities.RL_environments.rl_pricing_env import convert_to_vector
 
 
@@ -126,125 +127,25 @@ class Operator:  # we also need a class for normal vehicles!!!
         :param num_lookahead_periods: number of planning periods for which plan is created
         :return:
         """
-        # while True:
-        current_time = self.env.now
-        sim_time = self.sim_time
-        final_time = min(
-            sim_time,
-            round(
-                current_time
-                + self.planning_interval * self.num_lookahead_planning_periods
-            ),
+        results = get_exp_free_grid_capacity_utility(
+            current_time=self.env.now,
+            sim_time=self.sim_time,
+            planning_interval=self.planning_interval,
+            num_lookahead_planning_periods=self.num_lookahead_planning_periods,
+            num_lookback_periods=self.num_lookback_periods,
+            baseload=self.baseload,
+            non_dispatchable_generator=self.non_dispatchable_generator,
+            electric_storage=self.electric_storage,
+            charging_strategy=self.charging_strategy,
+            charging_hub=self.charging_hub,
+            grid_capa=self.grid_capa,
         )
 
-        # get periods in lookahead_window
-        periods = []
-        t = current_time
-        while t < final_time:
-            periods.append(t)
-            t += self.planning_interval
-
-        # get list of free grid capa
-        free_capa_list_actual = []
-        base_load_list = []
-        generation_list = []
-        free_capa_list_predicted = []
-
-        for t in periods:
-            # ACTUAL
-            baseload_max = max(
-                self.baseload.loc[t : t + self.planning_interval - 1][
-                    "load_kw_rescaled"
-                ]
-            )
-            self.baseload_min = min(
-                self.baseload.loc[t : t + self.planning_interval - 1][
-                    "load_kw_rescaled"
-                ]
-            )
-            self.baseload_max = baseload_max
-            generation_min = min(
-                self.non_dispatchable_generator.generation_profile_actual.loc[
-                    t : t + self.planning_interval - 1
-                ]["pv_generation"]
-            )
-            self.generation_min = generation_min
-            battery_max = min(
-                self.electric_storage.kW_discharge_peak,
-                (
-                    (
-                        self.electric_storage.SoC
-                        - self.electric_storage.min_energy_stored_kWh
-                    )
-                    * (60 / self.planning_interval)
-                ),
-            )
-
-            if self.charging_strategy in [
-                "dynamic",
-                "integrated_storage",
-                "online_multi_period",
-            ]:
-                battery_max = 0
-            battery_usage = 0
-            if self.charging_hub.dynamic_pricing:
-
-                battery_usage = (
-                    self.electric_storage.discharging_power
-                    - self.electric_storage.charging_power
-                )
-            free_capa_list_actual.append(
-                self.grid_capa
-                - baseload_max
-                + generation_min
-                + battery_max
-                + battery_usage
-            )
-            # PREDICTED
-            offset_period = (
-                self.num_lookback_periods
-            )  # how many periods to go back for prediction, here we fix to 1 day
-            baseload_max_pred = max(
-                self.baseload.loc[
-                    (t - offset_period) : (t - offset_period)
-                    + (self.planning_interval - 1)
-                ]["load_kw_rescaled"]
-            )
-            generation_min_pred = min(
-                self.non_dispatchable_generator.generation_profile_forecast.loc[
-                    t : t + self.planning_interval - 1
-                ]["pv_generation"]
-            )
-            battery_max = min(
-                self.electric_storage.kW_discharge_peak,
-                (
-                    (
-                        self.electric_storage.SoC
-                        - self.electric_storage.min_energy_stored_kWh
-                    )
-                    * (60 / self.planning_interval)
-                ),
-            )
-            free_capa_list_predicted.append(
-                self.grid_capa
-                - baseload_max_pred
-                + generation_min_pred
-                + battery_max
-                + battery_usage
-            )
-            base_load_list.append(baseload_max_pred)
-            generation_list.append(generation_min_pred)
-
-        # update free_grid_capa
-        self.free_grid_capa_actual = free_capa_list_actual
-        self.base_load_list = base_load_list
-        self.generation_list = generation_list
-        self.free_grid_capa_without_storage = (
-            free_capa_list_actual[0] - battery_max - battery_usage
-        )
-        self.free_grid_capa_predicted = free_capa_list_predicted
-        # return free_capa_list
-        # yield self.env.timeout(self.planning_period_length)
+        self.free_grid_capa_actual = results["free_grid_capa_actual"]
+        self.base_load_list = results["base_load_list"]
+        self.generation_list = results["generation_list"]
+        self.free_grid_capa_without_storage = results["free_grid_capa_without_storage"]
+        self.free_grid_capa_predicted = results["free_grid_capa_predicted"]
 
     def get_available_battery_load(self):
         """
