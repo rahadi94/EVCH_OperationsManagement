@@ -87,7 +87,7 @@ class Configuration:
             energy_prices = np.append(energy_prices, np.array([power[i], prices[i]]))
         self.energy_prices = energy_prices.reshape(len(prices), 2)
         self._vehicle_configs = {}
-        self.dynamic_pricing = True
+        self.dynamic_pricing = False
 
         if mode == "tra":
             self.capacity_pricing = False

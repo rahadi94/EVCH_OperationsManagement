@@ -13,3 +13,28 @@ The following modules are included:
 - **`Infrastructure` Module:** Initializes infrastructure objects (EV supply equipment (EVSE), connectors per each EVSE, grid connection capacity, on-site storage and on-site generation (PV))  
 - **`Operations` Module:** Conatain algorithms for assigning physical space (vehicle routing) and electrical capacity (vehicle charging) to individual vehicle objects based on a pre-defined charging policy
 - **`Results` Module:** Monitors EVCC activity in pre-defined intervals and accounts costs. Includes plotting routines.
+
+## 📦 Installation
+
+This project uses [`uv`](https://github.com/astral-sh/uv), a modern and ultra-fast Python package manager compatible with pip.
+
+### 1. Install `uv`
+
+If you don’t have `uv` installed, run:
+
+### Installation Steps
+
+```bash
+# Step 1: Install uv
+pip install uv
+
+# Step 2: Create a virtual environment
+python -m venv .venv
+
+# Step 3: Activate the environment
+source .venv/bin/activate        # On macOS/Linux
+# or
+.venv\Scripts\activate           # On Windows
+
+# Step 4: Install dependencies
+uv pip install -r requirements.uv.txt

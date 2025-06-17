@@ -19,6 +19,8 @@ SUMMER_START = Configuration.instance().SUMMER_START
 SUMMER_END = Configuration.instance().SUMMER_END
 POST_FIX = Configuration.instance().POST_FIX
 
+Configuration.instance().dynamic_pricing = True
+
 evaluate_after_training = Configuration.instance().evaluation_after_training
 number_of_chargers = 200
 PV_CAPA = Configuration.instance().PV
