@@ -166,28 +166,6 @@ class Operator:  # we also need a class for normal vehicles!!!
 
         self.free_battery_load_capa = battery_max
 
-    # pricing for different power usages
-
-    def get_power_prices(self, mode):
-        """
-        Routes new arrivals to charging stations. This is on a discrete event basis, i.e. per each arrival (as opposed to the ca)
-        :param routing_strategy:
-        :return:
-        """
-        while True:
-            self.get_exp_free_grid_capacity()
-            self.update_vehicles_status()
-            self.take_pricing_action()
-            self.price_history = pd.concat(
-                [self.price_history, pd.DataFrame(self.price_pairs[:, 1]).transpose()]
-            )
-            self.update_peak_load_history()
-            if mode == "discrete_time":
-                yield self.env.timeout(self.planning_interval)
-            if mode == "discrete_event":
-                yield self.arrival_event
-            self.update_pricing_agent()
-
     # routing
     def get_routing_instructions(self, request):
         """
@@ -220,6 +198,195 @@ class Operator:  # we also need a class for normal vehicles!!!
         return charger
 
     # charging
+    def schedule_charging_and_routing_perfect_info(self, strategy):
+        self.get_exp_free_grid_capacity()
+        connected_vehicles = [x for x in self.requests if x.mode is None and x.ev == 1]
+
+        if strategy == "perfect_info":
+            integrate_algos.perfect_info_charging_routing(
+                vehicles=connected_vehicles,
+                charging_stations=self.chargers,
+                env=self.env,
+                grid_capacity=self.free_grid_capa_actual,
+                electricity_cost=self.electricity_tariff,
+                baseload=self.base_load_list,
+                sim_time=self.sim_time,
+                generation=self.generation_list,
+            )
+        elif strategy == "perfect_info_with_storage" and connected_vehicles:
+            integrate_algos.perfect_info_charging_routing_storage(
+                vehicles=connected_vehicles,
+                charging_stations=self.chargers,
+                env=self.env,
+                grid_capacity=self.free_grid_capa_actual,
+                electricity_cost=self.electricity_tariff,
+                sim_time=self.sim_time,
+                storage=self.electric_storage,
+                baseload=self.baseload_list,
+            )
+
+    def apply_charging_routing_storage_perfect_info(self, charging_strategy):
+        hour = int((self.env.now % 1440) / 60) if charging_strategy == "perfect_info_with_storage" else int(
+            self.env.now / 60)
+
+        for request in self.requests:
+            if request.ev == 1:
+                request.charging_power = request.charge_schedule[hour]
+
+        if charging_strategy == "perfect_info_with_storage" and self.storage_object.max_capacity_kWh > 0:
+            storage_power = self.electric_storage.charge_schedule[hour]
+            if storage_power >= 0:
+                self.electric_storage.charge_yn = 1
+                self.electric_storage.discharge_yn = 0
+                self.electric_storage.discharging_power = 0
+                self.electric_storage.charging_power = storage_power
+            else:
+                self.electric_storage.charge_yn = 0
+                self.electric_storage.discharge_yn = 1
+                self.electric_storage.discharging_power = storage_power
+                self.electric_storage.charging_power = 0
+
+    def take_dynamic_pricing_actions(self):
+        self.get_exp_free_grid_capacity()
+        self.update_vehicles_status()
+        self.take_pricing_action()
+        if self.pricing_mode == "Discrete":
+            self.price_history = pd.concat(
+                [
+                    self.price_history,
+                    pd.DataFrame(self.price_pairs[:, 1]).transpose(),
+                ]
+            )
+        if self.pricing_mode == "Continuous":
+            # print([self.pricing_parameters[1], self.parking_fee])
+            self.price_history = pd.concat(
+                [
+                    self.price_history,
+                    pd.DataFrame(
+                        [self.pricing_parameters[0], self.pricing_parameters[1]]
+                    ).transpose(),
+                ]
+            )
+
+    def take_static_ricing_action(self):
+        self.get_exp_free_grid_capacity()
+        self.update_vehicles_status()
+        if self.pricing_mode == "ToU":
+            hour = int((self.env.now % 1440) / 60)
+            self.pricing_parameters[0] = (
+                    self.electricity_tariff[hour]
+                    / max(self.electricity_tariff)
+                    * Configuration.instance().max_price_ToU
+            )
+        if self.pricing_mode == "perfect_info":
+            if Configuration.instance().dynamic_fix_term_pricing:
+                self.pricing_parameters[1] = self.price_schedules[1][hour]
+                self.pricing_parameters[0] = self.price_schedules[0][hour]
+            else:
+                self.pricing_parameters[1] = self.price_schedules[hour]
+        if self.pricing_mode == "Discrete":
+            self.price_history = pd.concat(
+                [
+                    self.price_history,
+                    pd.DataFrame(self.price_pairs[:, 1]).transpose(),
+                ]
+            )
+        if self.pricing_mode == "Continuous" or self.pricing_mode == "ToU":
+            self.price_history = pd.concat(
+                [
+                    self.price_history,
+                    pd.DataFrame(
+                        [self.pricing_parameters[0], self.pricing_parameters[1]]
+                    ).transpose(),
+                ]
+            )
+
+    def take_non_learning_charging_actions(self, charging_strategy, connected_vehicles):
+        strategy_functions = {
+            "uncontrolled": charge_algos.uncontrolled,
+            "average_power": charge_algos.average_power,
+            "first_come_first_served": charge_algos.first_come_first_served,
+            "earliest_deadline_first": charge_algos.earliest_deadline_first,
+            "least_laxity_first": charge_algos.least_laxity_first,
+            "equal_sharing": charge_algos.equal_sharing
+            }
+
+        if charging_strategy in strategy_functions:
+            strategy_functions[charging_strategy](env=self.env,
+                    connected_vehicles=connected_vehicles,
+                    charging_stations=self.chargers,
+                    charging_capacity=self.charging_capa,
+                    free_grid_capacity=self.free_grid_capa_actual,
+                    planning_period_length=self.planning_interval,)
+
+        if charging_strategy == "online_myopic":
+            charge_algos.online_myopic(
+                vehicles=connected_vehicles,
+                charging_stations=self.chargers,
+                env=self.env,
+                grid_capacity=self.free_grid_capa_actual,
+                optimization_period_length=self.optimization_period_length,
+                alpha=0,
+            )
+
+        # Charging algos that DO require foresight
+
+        if charging_strategy == "online_multi_period":
+            if max(self.charging_hub.grid.grid_usage) > self.peak_threshold:
+                self.peak_threshold = max(self.charging_hub.grid.grid_usage)
+            if len(connected_vehicles) > 0:
+                charge_algos.online_multi_period(
+                    vehicles=connected_vehicles,
+                    charging_stations=self.chargers,
+                    env=self.env,
+                    free_grid_capa_actual=self.free_grid_capa_actual,
+                    free_grid_capa_predicted=self.free_grid_capa_predicted,
+                    peak_load_history=self.peak_load_history,
+                    electricity_cost=self.electricity_tariff,
+                    sim_time=self.sim_time,
+                    service_level=self.service_level,
+                    optimization_period_length=self.optimization_period_length,
+                    num_lookahead_planning_periods=4,
+                    flex_margin=0.5,
+                    peak_threshold=self.peak_threshold,
+                )
+
+        if charging_strategy == "integrated_storage":
+            if len(connected_vehicles) > 0:
+                charge_algos.integrated_charging_storage(
+                    storage=self.electric_storage,
+                    vehicles=connected_vehicles,
+                    charging_stations=self.chargers,
+                    env=self.env,
+                    free_grid_capa_actual=self.free_grid_capa_actual,
+                    free_grid_capa_predicted=self.free_grid_capa_predicted,
+                    peak_load_history=self.peak_load_history,
+                    electricity_cost=self.electricity_tariff,
+                    sim_time=self.sim_time,
+                    service_level=self.service_level,
+                    optimization_period_length=self.optimization_period_length,
+                    num_lookahead_planning_periods=12,
+                    flex_margin=0.5,
+                )
+    def take_learning_charging_actions(self, charging_strategy):
+        if charging_strategy == "dynamic":
+            self.update_vehicles_status()
+            self.take_charging_action()
+            self.conduct_charging_action()
+
+            if self.storage_agent:
+                self.get_exp_free_grid_capacity()
+                self.take_storage_action()
+                self.conduct_storage_action()
+
+    def update_learning_charging_and_pricing_agents(self, charging_strategy):
+        if charging_strategy == "dynamic":
+            self.update_charging_agent()
+            if self.storage_agent:
+                self.update_storage_agent()
+        if self.charging_hub.dynamic_pricing:
+            self.update_pricing_agent()
+
     def get_charging_schedules_and_prices(self, charging_strategy, mode):
         """
         Periodically updates charging schedule based on selected strategy. Decides which vehicle charges and how much!
@@ -229,257 +396,24 @@ class Operator:  # we also need a class for normal vehicles!!!
         :param planning_period_length: length of period (in unit sim time). Schedule is re-computed every n(=period_length) time steps
         :return: n/a
         """
-        first_scheduling = False
+        # first_scheduling = False
+        if charging_strategy in ["perfect_info", "perfect_info_with_storage"]:
+            self.schedule_charging_and_routing_perfect_info(charging_strategy)
         while True:
+            self.get_exp_free_grid_capacity()
+            self.get_available_battery_load()
+            connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
             if charging_strategy in ["perfect_info", "perfect_info_with_storage"]:
-                def schedule_charging(strategy):
-                    self.get_exp_free_grid_capacity()
-                    connected_vehicles = [x for x in self.requests if x.mode is None and x.ev == 1]
-
-                    if strategy == "perfect_info":
-                        integrate_algos.perfect_info_charging_routing(
-                            vehicles=connected_vehicles,
-                            charging_stations=self.chargers,
-                            env=self.env,
-                            grid_capacity=self.free_grid_capa_actual,
-                            electricity_cost=self.electricity_tariff,
-                            baseload=self.base_load_list,
-                            sim_time=self.sim_time,
-                            generation=self.generation_list,
-                        )
-                    elif strategy == "perfect_info_with_storage" and connected_vehicles:
-                        integrate_algos.perfect_info_charging_routing_storage(
-                            vehicles=connected_vehicles,
-                            charging_stations=self.chargers,
-                            env=self.env,
-                            grid_capacity=self.free_grid_capa_actual,
-                            electricity_cost=self.electricity_tariff,
-                            sim_time=self.sim_time,
-                            storage=self.electric_storage,
-                            baseload=self.baseload_list,
-                        )
-
-                if not first_scheduling:
-                    schedule_charging(charging_strategy)
-                    first_scheduling = True
-
-                hour = int((self.env.now % 1440) / 60) if charging_strategy == "perfect_info_with_storage" else int(
-                    self.env.now / 60)
-
-                for request in self.requests:
-                    if request.ev == 1:
-                        request.charging_power = request.charge_schedule[hour]
-
-                if charging_strategy == "perfect_info_with_storage" and self.storage_object.max_capacity_kWh > 0:
-                    storage_power = self.electric_storage.charge_schedule[hour]
-                    if storage_power >= 0:
-                        self.electric_storage.charge_yn = 1
-                        self.electric_storage.discharge_yn = 0
-                        self.electric_storage.discharging_power = 0
-                        self.electric_storage.charging_power = storage_power
-                    else:
-                        self.electric_storage.charge_yn = 0
-                        self.electric_storage.discharge_yn = 1
-                        self.electric_storage.discharging_power = storage_power
-                        self.electric_storage.charging_power = 0
+                self.apply_charging_routing_storage_perfect_info(charging_strategy)
 
             if self.charging_hub.dynamic_pricing:
-                self.get_exp_free_grid_capacity()
-                self.update_vehicles_status()
-                self.take_pricing_action()
-                if self.pricing_mode == "Discrete":
-                    self.price_history = pd.concat(
-                        [
-                            self.price_history,
-                            pd.DataFrame(self.price_pairs[:, 1]).transpose(),
-                        ]
-                    )
-                if self.pricing_mode == "Continuous":
-                    # print([self.pricing_parameters[1], self.parking_fee])
-                    self.price_history = pd.concat(
-                        [
-                            self.price_history,
-                            pd.DataFrame(
-                                [self.pricing_parameters[0], self.pricing_parameters[1]]
-                            ).transpose(),
-                        ]
-                    )
+                self.take_dynamic_pricing_actions()
 
             else:
-                self.get_exp_free_grid_capacity()
-                self.update_vehicles_status()
-                if self.pricing_mode == "ToU":
-                    hour = int((self.env.now % 1440) / 60)
-                    self.pricing_parameters[0] = (
-                        self.electricity_tariff[hour]
-                        / max(self.electricity_tariff)
-                        * Configuration.instance().max_price_ToU
-                    )
-                if self.pricing_mode == "perfect_info":
-                    if Configuration.instance().dynamic_fix_term_pricing:
-                        self.pricing_parameters[1] = self.price_schedules[1][hour]
-                        self.pricing_parameters[0] = self.price_schedules[0][hour]
-                    else:
-                        self.pricing_parameters[1] = self.price_schedules[hour]
-                if self.pricing_mode == "Discrete":
-                    self.price_history = pd.concat(
-                        [
-                            self.price_history,
-                            pd.DataFrame(self.price_pairs[:, 1]).transpose(),
-                        ]
-                    )
-                if self.pricing_mode == "Continuous" or self.pricing_mode == "ToU":
-                    self.price_history = pd.concat(
-                        [
-                            self.price_history,
-                            pd.DataFrame(
-                                [self.pricing_parameters[0], self.pricing_parameters[1]]
-                            ).transpose(),
-                        ]
-                    )
+                self.take_static_ricing_action()
 
-            if charging_strategy == "uncontrolled":
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                charge_algos.uncontrolled(
-                    env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_capacity=self.charging_capa,
-                    planning_period_length=self.planning_interval,
-                )
-
-            if charging_strategy == "average_power":
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                charge_algos.average_power(
-                    env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_capacity=self.charging_capa,
-                    planning_period_length=self.planning_interval,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                )
-
-            if charging_strategy == "first_come_first_served":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                charge_algos.first_come_first_served(
-                    env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    charging_capacity=self.charging_capa,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                    # free_battery_capacity = self.free_battery_load_capa,
-                    planning_period_length=self.planning_interval,
-                )
-
-            if charging_strategy == "earliest_deadline_first":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                charge_algos.earliest_deadline_first(
-                    env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    charging_capacity=self.charging_capa,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                    # free_battery_capacity=self.free_battery_load_capa,
-                    planning_period_length=self.planning_interval,
-                )
-
-            if charging_strategy == "least_laxity_first":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                # print([x.id for x in connected_vehicles])
-                charge_algos.least_laxity_first(
-                    env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    charging_capacity=self.charging_capa,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                    # free_battery_capacity = self.free_battery_load_capa,
-                    planning_period_length=self.planning_interval,
-                )
-
-            if charging_strategy == "equal_sharing":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                charge_algos.equal_sharing(
-                    charging_stations=self.chargers,
-                    charging_capacity=self.charging_capa,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                    free_battery_capacity=self.free_battery_load_capa,
-                )
-
-            if charging_strategy == "online_myopic":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                charge_algos.online_myopic(
-                    vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    env=self.env,
-                    grid_capacity=self.free_grid_capa_actual,
-                    optimization_period_length=self.optimization_period_length,
-                    alpha=0,
-                )
-
-            # Charging algos that DO require foresight
-
-            if charging_strategy == "online_multi_period":
-                self.get_available_battery_load()
-                self.get_exp_free_grid_capacity()
-                if max(self.charging_hub.grid.grid_usage) > self.peak_threshold:
-                    self.peak_threshold = max(self.charging_hub.grid.grid_usage)
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                if len(connected_vehicles) > 0:
-                    charge_algos.online_multi_period(
-                        vehicles=connected_vehicles,
-                        charging_stations=self.chargers,
-                        env=self.env,
-                        free_grid_capa_actual=self.free_grid_capa_actual,
-                        free_grid_capa_predicted=self.free_grid_capa_predicted,
-                        peak_load_history=self.peak_load_history,
-                        electricity_cost=self.electricity_tariff,
-                        sim_time=self.sim_time,
-                        service_level=self.service_level,
-                        optimization_period_length=self.optimization_period_length,
-                        num_lookahead_planning_periods=4,
-                        flex_margin=0.5,
-                        peak_threshold=self.peak_threshold,
-                    )
-
-            if charging_strategy == "integrated_storage":
-                self.get_exp_free_grid_capacity()
-                self.get_available_battery_load()
-                connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
-                if len(connected_vehicles) > 0:
-                    charge_algos.integrated_charging_storage(
-                        storage=self.electric_storage,
-                        vehicles=connected_vehicles,
-                        charging_stations=self.chargers,
-                        env=self.env,
-                        free_grid_capa_actual=self.free_grid_capa_actual,
-                        free_grid_capa_predicted=self.free_grid_capa_predicted,
-                        peak_load_history=self.peak_load_history,
-                        electricity_cost=self.electricity_tariff,
-                        sim_time=self.sim_time,
-                        service_level=self.service_level,
-                        optimization_period_length=self.optimization_period_length,
-                        num_lookahead_planning_periods=12,
-                        flex_margin=0.5,
-                    )
-
-            if charging_strategy == "dynamic":
-
-                self.get_exp_free_grid_capacity()
-                self.update_vehicles_status()
-                self.take_charging_action()
-                self.conduct_charging_action()
-
-                ### active these lines if we have separate battery agent
-                # self.get_exp_free_grid_capacity()
-                # self.take_storage_action()
-                # self.conduct_storage_action()
+            self.take_non_learning_charging_actions(charging_strategy, connected_vehicles)
+            self.take_learning_charging_actions(connected_vehicles)
 
             # update peak load history
             self.update_peak_load_history()
@@ -489,13 +423,10 @@ class Operator:  # we also need a class for normal vehicles!!!
                 yield self.env.timeout(self.planning_interval)
             if mode == "discrete_event":
                 yield self.arrival_event
-            if charging_strategy == "dynamic":
-                # if len(connected_vehicles) > 0:
-                self.update_charging_agent()
-                ### active these lines if we have separate battery agent
-                # self.update_storage_agent()
-            if self.charging_hub.dynamic_pricing:
-                self.update_pricing_agent()
+
+            self.update_learning_charging_and_pricing_agents(charging_strategy)
+
+
 
     def take_charging_action(self):
         state = self.charging_hub.charging_agent.environment.get_state(

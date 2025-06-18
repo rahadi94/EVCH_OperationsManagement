@@ -18,7 +18,12 @@ from Environment.log import lg
 # UNCONTROLLED CHARGING#
 
 
-def uncontrolled(env, connected_vehicles, charging_capacity, planning_period_length):
+def uncontrolled(env,
+    connected_vehicles,
+    charging_stations,
+    charging_capacity,
+    free_grid_capacity,
+    planning_period_length,):
     """
     :param env:
     :param requests:
@@ -348,7 +353,12 @@ def custom_priority(charging_stations, charging_capacity, free_grid_capacity):
 
 
 def equal_sharing(
-    charging_stations, charging_capacity, free_grid_capacity, free_battery_capacity
+    env,
+    connected_vehicles,
+    charging_stations,
+    charging_capacity,
+    free_grid_capacity,
+    planning_period_length,
 ):
     """
     Computes same-period charging power per each connected vehicle by cascading available grid power equally through the network
@@ -400,9 +410,10 @@ def equal_sharing(
 def average_power(
     env,
     connected_vehicles,
+    charging_stations,
     charging_capacity,
-    planning_period_length,
     free_grid_capacity,
+    planning_period_length,
 ):
     """
     :param env:

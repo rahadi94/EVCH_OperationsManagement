@@ -59,7 +59,7 @@ class Configuration:
         self.price_sensitivity = price_sensitivity
         peak_penalty = "m"  # l, m, h
         self.adjust_peak_penalty(peak_penalty)
-        charging_algorithm = "average_power"  # average_power, least_laxity_first
+        charging_algorithm = "average_power"  # average_power, least_laxity_first, perfect_info
         self.charging_algorithm = charging_algorithm
         self.peak_penalty = peak_penalty
         PV = 500
