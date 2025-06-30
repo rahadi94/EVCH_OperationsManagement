@@ -89,12 +89,6 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.pricing_agent = None
         self.minimum_served_demand = minimum_served_demand
         self.agent_name = "PGMM"  # PGM or n_step
-        self.action = np.zeros(121)
-        self.storage_action = [0]
-        # self.pricing_action = None
-        # self.state = None
-        # self.pricing_state = None
-        self.storage_state = None
         self.generation_min = 0
         self.peak_threshold = Configuration.instance().peak_threshold
         self.peak_cost = Configuration.instance().peak_cost
@@ -268,7 +262,7 @@ class Operator:  # we also need a class for normal vehicles!!!
                 ]
             )
 
-    def take_static_ricing_action(self):
+    def take_static_pricing_action(self):
         self.get_exp_free_grid_capacity()
         self.update_vehicles_status()
         if self.pricing_mode == "ToU":
@@ -410,7 +404,7 @@ class Operator:  # we also need a class for normal vehicles!!!
                 self.take_dynamic_pricing_actions()
 
             else:
-                self.take_static_ricing_action()
+                self.take_static_pricing_action()
 
             self.take_non_learning_charging_actions(charging_strategy, connected_vehicles)
             self.take_learning_charging_actions(connected_vehicles)
@@ -426,8 +420,6 @@ class Operator:  # we also need a class for normal vehicles!!!
 
             self.update_learning_charging_and_pricing_agents(charging_strategy)
 
-
-
     def take_charging_action(self):
         state = self.charging_hub.charging_agent.environment.get_state(
             self.charging_hub, self.env
@@ -439,94 +431,75 @@ class Operator:  # we also need a class for normal vehicles!!!
         # while not self.done:
         action = self.charging_agent.pick_action(eval_ep, self.charging_hub)
         self.charging_agent.action = self.charging_agent.rescale_action(action)
-        self.action = self.charging_agent.action
 
     def take_pricing_action(self):
-        pricing_state = self.pricing_agent.environment.get_state(
-            self.charging_hub, self.env
-        )
+        # Get current state from environment
+        pricing_state = self.pricing_agent.environment.get_state(self.charging_hub, self.env)
         self.pricing_agent.state = pricing_state
-
         eval_ep = self.pricing_agent.do_evaluation_iterations
 
-        if Configuration.instance().pricing_mode == "Discrete":
-            # self.pricing_agent.episode_step_number_val = 0
-            # while not self.done:
-            if self.pricing_agent.agent_name == "DQN":
+        pricing_mode = Configuration.instance().pricing_mode
+        agent_name = self.pricing_agent.agent_name
+
+        if pricing_mode == "Discrete":
+            if agent_name == "DQN":
                 self.pricing_agent.action = self.pricing_agent.pick_action()
-
-            if self.pricing_agent.agent_name == "SAC":
-                self.pricing_agent.action = self.pricing_agent.pick_action(
-                    eval_ep, self.charging_hub
-                )
-
-            if self.pricing_agent.agent_name == "SAC":
-                rescaled_actions = self.pricing_agent.environment.rescale_action(
-                    self.pricing_agent.action
-                )
-                number_of_power_options = len(self.price_pairs[:, 1])
-                final_pricing = rescaled_actions[0:number_of_power_options]
-                # for i in range(len(final_pricing)):
-                self.price_pairs[0, 1] = final_pricing[0]
-                self.price_pairs[1, 1] = min(final_pricing[1], 1.5)
-                # if Configuration.instance().limiting_grid_capa:
-                #     self.grid_capa = rescaled_actions[number_of_power_options]
-                # if len(rescaled_actions) >= number_of_power_options + 2:
-                #     self.storage_action = [rescaled_actions[number_of_power_options+1]]
-                # self.conduct_storage_action()
-            if self.pricing_agent.agent_name == "DQN":
                 if len(self.price_pairs[:, 1]) > 1:
                     vector_prices = convert_to_vector(self.pricing_agent.action)
                 else:
                     vector_prices = [self.pricing_agent.action]
-                final_pricing = self.pricing_agent.environment.get_final_prices_DQN(
-                    vector_prices
-                )
-                for i in range(len(final_pricing)):
-                    self.price_pairs[i, 1] = final_pricing[i]
+                final_pricing = self.pricing_agent.environment.get_final_prices_DQN(vector_prices)
+                for i, price in enumerate(final_pricing):
+                    self.price_pairs[i, 1] = price
 
-        if Configuration.instance().pricing_mode == "Continuous":
-            self.pricing_agent.action = self.pricing_agent.pick_action(
-                eval_ep, self.charging_hub
-            )
-            rescaled_actions = self.pricing_agent.environment.rescale_action(
-                self.pricing_agent.action
-            )
-            # self.pricing_parameters[0] = rescaled_actions[0]
-            if (
-                not Configuration.instance().dynamic_fix_term_pricing
-                and Configuration.instance().capacity_pricing
-            ):
+            elif agent_name == "SAC":
+                self.pricing_agent.action = self.pricing_agent.pick_action(eval_ep, self.charging_hub)
+                rescaled_actions = self.pricing_agent.environment.rescale_action(self.pricing_agent.action)
+                number_of_power_options = len(self.price_pairs[:, 1])
+                final_pricing = rescaled_actions[:number_of_power_options]
+                self.price_pairs[0, 1] = final_pricing[0]
+                self.price_pairs[1, 1] = min(final_pricing[1], 1.5)
+
+                # Optional: handle grid capacity and storage
+                # if Configuration.instance().limiting_grid_capa:
+                #     self.grid_capa = rescaled_actions[number_of_power_options]
+                # if len(rescaled_actions) >= number_of_power_options + 2:
+                #     self.storage_agent.action = [rescaled_actions[number_of_power_options + 1]]
+                #     self.conduct_storage_action()
+
+        elif pricing_mode == "Continuous":
+            self.pricing_agent.action = self.pricing_agent.pick_action(eval_ep, self.charging_hub)
+            rescaled_actions = self.pricing_agent.environment.rescale_action(self.pricing_agent.action)
+
+            config = Configuration.instance()
+            if not config.dynamic_fix_term_pricing and config.capacity_pricing:
                 self.pricing_parameters[1] = rescaled_actions[0]
-            if (
-                Configuration.instance().dynamic_fix_term_pricing
-                and not Configuration.instance().capacity_pricing
-            ):
+
+            elif config.dynamic_fix_term_pricing and not config.capacity_pricing:
                 self.pricing_parameters[0] = rescaled_actions[0]
-                if Configuration.instance().dynamic_parking_fee:
+                if config.dynamic_parking_fee:
                     self.parking_fee = rescaled_actions[1]
-            if (
-                Configuration.instance().dynamic_fix_term_pricing
-                and Configuration.instance().capacity_pricing
-            ):
+
+            elif config.dynamic_fix_term_pricing and config.capacity_pricing:
                 self.pricing_parameters[0] = rescaled_actions[0]
                 self.pricing_parameters[1] = rescaled_actions[1]
-            if Configuration.instance().limiting_grid_capa:
 
+            if config.limiting_grid_capa:
                 self.grid_capa = rescaled_actions[1]
-            if Configuration.instance().dynamic_storage_scheduling:
-                self.storage_action = [rescaled_actions[1]]
-            self.conduct_storage_action()
 
-        self.charging_hub.grid.reset_reward()
+            if config.dynamic_storage_scheduling:
+                self.storage_agent.action = [rescaled_actions[1]]
+
+            self.conduct_storage_action(given_storage_action=[rescaled_actions[1]])
+
+        # Reset reward at the end
+        self.charging_hub.grid.reset_reward() #TODO: it does not belong to the grid object
 
     def take_storage_action(self):
-        self.storage_state = self.charging_hub.storage_agent.environment.get_state(
+        storage_state = self.charging_hub.storage_agent.environment.get_state(
             self.charging_hub, self.env
         )
-        self.storage_agent.state = self.storage_state
-
-        # self.get_battery_max_min()
+        self.storage_agent.state = storage_state
 
         eval_ep = self.storage_agent.do_evaluation_iterations
         self.storage_agent.episode_step_number_val = 0
@@ -534,7 +507,6 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.storage_agent.action = self.storage_agent.pick_action(
             eval_ep, self.charging_hub
         )
-        self.storage_action = self.storage_agent.action
 
     def get_battery_max_min(self):
         bound_1 = (
@@ -560,10 +532,12 @@ class Operator:  # we also need a class for normal vehicles!!!
             discharging_bound = max(bound_1, bound_2, bound_3)
         self.charging_hub.max_battery_discharging_rate = discharging_bound
         self.storage_agent.action_range = [discharging_bound, charging_bound]
-        # print(self.charging_hub.max_battery_charging_rate, self.electric_storage.SoC ,self.charging_hub.max_battery_discharging_rate)
 
-    def check_storage(self):
-        storage_power = self.storage_action[0]
+    def check_storage(self, given_storage_action=None):
+        if given_storage_action:
+            storage_power = given_storage_action[0]
+        else:
+            storage_power = self.storage_agent.action[0]
         if storage_power >= 0:
             if (
                 self.storage_object.SoC
@@ -613,87 +587,67 @@ class Operator:  # we also need a class for normal vehicles!!!
             self.charging_hub.electric_storage.charging_power = 0
             self.charging_hub.electric_storage.discharge_yn = 1
             self.charging_hub.electric_storage.discharging_power = -storage_power
+        if given_storage_action:
+            raw_storage_power = given_storage_action[0]
+        else:
+            raw_storage_power = self.storage_agent.action[0]
+
         self.charging_hub.reward["feasibility_storage"] += abs(
-            self.storage_action[0] - storage_power
-        )
-        # print(self.charging_hub.electric_storage.charging_power, self.charging_hub.electric_storage.discharging_power)
-        # print(self.storage_action[0], storage_power, self.electric_storage.SoC)
-        # self.storage_action[0] = storage_power
-
-    def check_charging_power(self):
-        evaluation = False  # self.charging_agent.do_evaluation_iterations
-        # Checking storage action
-        # First we ensure that the charging load is less that storage capacity and free grid power
-        storage_power = 0  # self.action[0]
-        all_charging_vehicles = np.asarray([])
-        i = 0
-        for charger in self.charging_hub.chargers:
-            charging_vehicles = charger.charging_vehicles
-            charger_usage = 0
-            charging_power_list = np.array(
-                [v.charging_power for v in charging_vehicles]
-            )
-            for j in range(charger.number_of_connectors):
-                try:
-                    charging_vehicles[j].action_id = i + 1
-                    if charging_vehicles[j].remaining_energy_deficit <= 0:
-                        self.charging_hub.reward["feasibility"] += self.action[i + 1]
-                        if evaluation:
-                            self.action[i + 1] = 0
-                except:
-                    self.charging_hub.reward["feasibility"] += self.action[i + 1]
-                    if evaluation:
-                        self.action[i + 1] = 0
-                i += 1
-
-            for vehicle in charging_vehicles:
-                if vehicle.remaining_energy_deficit <= 0:
-                    vehicle.charging_power = 0
-                charger_usage += vehicle.charging_power
-                all_charging_vehicles = np.append(all_charging_vehicles, vehicle)
-            self.charging_hub.reward["feasibility"] += max(
-                charger_usage - charger.power, 0
-            )
-            while charging_power_list.sum() > charger.power:
-                number_active_chargers = len(charging_power_list)
-                surplus_per_charger = (
-                    max(charging_power_list.sum() - charger.power + 0.1, 0)
-                    / number_active_chargers
-                )
-                for vehicle in charging_vehicles:
-                    vehicle.charging_power -= surplus_per_charger
-                    vehicle.charging_power = max(vehicle.charging_power, 0)
-                charging_power_list = np.array(
-                    [v.charging_power for v in charging_vehicles]
-                )
-
-        total_charging_power_list = np.array(
-            [v.charging_power for v in all_charging_vehicles]
-        )
-        grid_capa = min(self.action[0], self.free_grid_capa_actual[0])
-        self.charging_hub.reward["feasibility"] += max(
-            total_charging_power_list.sum() - grid_capa, 0
+             raw_storage_power - storage_power
         )
 
-        while total_charging_power_list.sum() + storage_power > grid_capa + 1:
-            number_active_chargers = len(total_charging_power_list)
-            surplus_per_charger = (
-                max(total_charging_power_list.sum() + storage_power - grid_capa, 0)
-                / number_active_chargers
-            )
-            for vehicle in all_charging_vehicles:
-                vehicle.charging_power -= surplus_per_charger
-                vehicle.charging_power = max(vehicle.charging_power, 0)
-                if evaluation:
-                    self.action[vehicle.action_id] = vehicle.charging_power
-            total_charging_power_list = np.array(
-                [v.charging_power for v in all_charging_vehicles]
-            )
-        if evaluation:
-            self.charging_hub.reward["feasibility"] = 0
+    def check_storage(self, given_storage_action=None):
+        # Determine the raw storage power action
+        raw_storage_power = (
+            given_storage_action[0] if given_storage_action else self.storage_agent.action[0]
+        )
+        storage_power = raw_storage_power
 
-    def conduct_storage_action(self):
-        storage_power = self.storage_action[0]
+        interval_factor = self.charging_hub.planning_interval / 60
+        soc = self.storage_object.SoC
+        max_energy = self.storage_object.max_energy_stored_kWh
+        grid_capacity = self.charging_hub.operator.free_grid_capa_without_storage
+
+        # Handle charging
+        if storage_power >= 0:
+            projected_soc = soc + storage_power * interval_factor
+            if projected_soc > max_energy:
+                storage_power = (max_energy - soc) / interval_factor
+            storage_power = min(storage_power, grid_capacity)
+
+            self.charging_hub.electric_storage.charge_yn = 1
+            self.charging_hub.electric_storage.charging_power = storage_power
+            self.charging_hub.electric_storage.discharge_yn = 0
+            self.charging_hub.electric_storage.discharging_power = 0
+
+        # Handle discharging
+        else:
+            hub_generation_kW = self.get_hub_generation_kW()
+            hub_demand_kW = self.get_hub_load_kW()
+
+            if not self.B2G and (storage_power + hub_demand_kW - hub_generation_kW < 0):
+                storage_power = -(hub_demand_kW - hub_generation_kW)
+
+            projected_soc = soc + storage_power * interval_factor
+            if projected_soc < 0:
+                storage_power = -max(soc / interval_factor, 0)
+
+            if soc <= 0:
+                storage_power = 0
+
+            self.charging_hub.electric_storage.charge_yn = 0
+            self.charging_hub.electric_storage.charging_power = 0
+            self.charging_hub.electric_storage.discharge_yn = 1
+            self.charging_hub.electric_storage.discharging_power = -storage_power
+
+        # Track feasibility deviation
+        self.charging_hub.reward["feasibility_storage"] += abs(raw_storage_power - storage_power)
+
+    def conduct_storage_action(self, given_storage_action=None):
+        if given_storage_action:
+            storage_power = given_storage_action[0]
+        else:
+            storage_power = self.storage_agent.action[0]
         if storage_power >= 0:
             self.charging_hub.electric_storage.charge_yn = 1
             self.charging_hub.electric_storage.charging_power = storage_power
@@ -704,121 +658,85 @@ class Operator:  # we also need a class for normal vehicles!!!
             self.charging_hub.electric_storage.charging_power = 0
             self.charging_hub.electric_storage.discharge_yn = 1
             self.charging_hub.electric_storage.discharging_power = -storage_power
-        self.check_storage()
+        self.check_storage(given_storage_action=given_storage_action)
 
     def conduct_charging_action(self):
-        action = self.action
-        i = 0
+        action = self.charging_agent.action
+        action_index = 1  # Start from 1 because action[0] is reserved (possibly for pricing or metadata)
+
         for charger in self.charging_hub.chargers:
-            charging_vehicles = charger.charging_vehicles
-            for connector in range(charger.number_of_connectors):
-                if action[i + 1] > 0:
-                    try:
-                        charging_vehicles[connector].charging_power = action[i + 1]
-                    except:
-                        pass
-                i += 1
+            for connector_idx in range(charger.number_of_connectors):
+                if action_index >= len(action):
+                    break  # Prevent index error if action list is shorter than expected
+
+                charging_power = action[action_index]
+                if charging_power > 0:
+                    charging_vehicles = charger.charging_vehicles
+                    if connector_idx < len(charging_vehicles):
+                        vehicle = charging_vehicles[connector_idx]
+                        vehicle.charging_power = charging_power
+                action_index += 1
+
         self.check_charging_power()
         self.charging_hub.grid.reset_reward()
 
     def update_pricing_agent(self):
         self.update_vehicles_status()
+
         if not self.charging_agent:
-            self.charging_hub.reward["missed"] = (
-                self.reward_computing()
-            )  # TODO: do we need to recalculate it?
-        if self.pricing_agent.agent_name == "new_SAC":
-            if len(self.pricing_agent.memory) > self.pricing_agent.config.batch_size:
-                # Number of updates per step in environment
-                for i in range(self.pricing_agent.config.updates_per_step):
-                    # Update parameters of all the networks
-                    critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = (
-                        self.pricing_agent.update_parameters(
-                            self.pricing_agent.memory,
-                            self.pricing_agent.batch_size,
-                            self.pricing_agent.updates,
-                        )
-                    )
-                    self.pricing_agent.updates += 1
+            # TODO: do we need to recalculate it?
+            self.charging_hub.reward["missed"] = self.reward_computing()
 
-            next_state, reward, done, _ = self.pricing_agent.environment.step(
-                self.pricing_agent.action, self.charging_hub, self.env
-            )
-            # print(self.pricing_agent.action)
-            mask = (
-                False
-                if self.pricing_agent.global_step_number
-                >= self.pricing_agent.environment._max_episode_steps
-                else self.pricing_agent.done
-            )
-            self.pricing_agent.memory.push(
-                self.pricing_agent.state, self.pricing_agent.action, reward, next_state, mask
-            )
-            self.pricing_agent.state = next_state
+        agent = self.pricing_agent
+        agent_name = agent.agent_name
+        config = agent.config
 
-        # SAC
-        if self.pricing_agent.agent_name == "SAC":
-            self.pricing_agent.conduct_action(
-                self.pricing_agent.action, self.charging_hub, self.env
-            )
-            eval_ep = self.pricing_agent.do_evaluation_iterations
-            if self.pricing_agent.time_for_critic_and_actor_to_learn():
-                if not eval_ep:
-                    for _ in range(
-                        self.pricing_agent.hyperparameters[
-                            "learning_updates_per_learning_session"
-                        ]
-                    ):
-                        self.pricing_agent.learn()
-            mask = (
-                False
-                if self.pricing_agent.global_step_number
-                >= self.pricing_agent.environment._max_episode_steps
-                else self.pricing_agent.done
-            )
-            # if not eval_ep:
-            action = self.pricing_agent.action
-            # action = self.pricing_agent.descale_action(self.pricing_agent.action, self.charging_hub)
-            # print(self.pricing_state, action, self.pricing_agent.reward, self.pricing_agent.next_state)
-            self.pricing_agent.save_experience(
+        if agent_name == "SAC":
+            agent.conduct_action(agent.action, self.charging_hub, self.env)
+            eval_ep = agent.do_evaluation_iterations
+
+            if agent.time_for_critic_and_actor_to_learn() and not eval_ep:
+                for _ in range(agent.hyperparameters["learning_updates_per_learning_session"]):
+                    agent.learn()
+
+            mask = False if agent.global_step_number >= agent.environment._max_episode_steps else agent.done
+
+            agent.save_experience(
                 experience=(
-                    self.pricing_agent.state,
-                    action,
-                    self.pricing_agent.reward,
-                    self.pricing_agent.next_state,
+                    agent.state,
+                    agent.action,
+                    agent.reward,
+                    agent.next_state,
                     mask,
                 )
             )
 
-        if self.pricing_agent.agent_name == "DQN":
-            self.pricing_agent.conduct_action(
-                self.pricing_agent.action, self.charging_hub, self.env
-            )
-            if self.pricing_agent.time_for_q_network_to_learn():
-                for _ in range(
-                    self.pricing_agent.hyperparameters["learning_iterations"]
-                ):
-                    self.pricing_agent.learn()
-            action = self.pricing_agent.action
-            self.pricing_agent.save_experience(
+        elif agent_name == "DQN":
+            agent.conduct_action(agent.action, self.charging_hub, self.env)
+
+            if agent.time_for_q_network_to_learn():
+                for _ in range(agent.hyperparameters["learning_iterations"]):
+                    agent.learn()
+
+            agent.save_experience(
                 experience=(
-                    self.pricing_agent.state,
-                    action,
-                    self.pricing_agent.reward,
-                    self.pricing_agent.next_state,
+                    agent.state,
+                    agent.action,
+                    agent.reward,
+                    agent.next_state,
                     False,
                 )
             )
 
-        self.pricing_agent.global_step_number += 1
+        agent.global_step_number += 1
 
     def update_storage_agent(self):
 
         eval_ep = self.storage_agent.do_evaluation_iterations
         action = self.storage_agent.descale_action(
-            self.storage_action, self.charging_hub
+            self.storage_agent.action, self.charging_hub
         )
-        self.storage_agent.conduct_action(action, self.charging_hub, self.env)
+        self.storage_agent.conduct_action(action, self.charging_hub, self.env, eval_ep=eval_ep)
         if self.storage_agent.time_for_critic_and_actor_to_learn():
             for _ in range(
                 self.storage_agent.hyperparameters[
@@ -832,13 +750,11 @@ class Operator:  # we also need a class for normal vehicles!!!
             >= self.storage_agent.environment._max_episode_steps
             else self.storage_agent.done
         )
-        if mask:
-            print("there is problem with mask")
         # if not eval_ep:
 
         self.storage_agent.save_experience(
             experience=(
-                self.storage_state,
+                self.storage_agent.state,
                 action,
                 self.storage_agent.reward,
                 self.storage_agent.next_state,
@@ -853,7 +769,7 @@ class Operator:  # we also need a class for normal vehicles!!!
         self.charging_hub.reward["missed"] = self.reward_computing()
 
         eval_ep = self.charging_agent.do_evaluation_iterations
-        self.charging_agent.conduct_action(self.action, self.charging_hub, self.env)
+        self.charging_agent.conduct_action(self.charging_agent.action, self.charging_hub, self.env)
         if self.charging_agent.time_for_critic_and_actor_to_learn():
             if not eval_ep:
                 for _ in range(
@@ -868,10 +784,8 @@ class Operator:  # we also need a class for normal vehicles!!!
             >= self.charging_agent.environment._max_episode_steps
             else self.charging_agent.done
         )
-        if mask:
-            print("there is problem with mask")
         # if not eval_ep:
-        action = self.charging_agent.descale_action(self.action, self.charging_hub)
+        action = self.charging_agent.descale_action(self.charging_agent.action, self.charging_hub)
         self.charging_agent.save_experience(
             experience=(
                 self.charging_agent.state,
@@ -1047,18 +961,10 @@ class Operator:  # we also need a class for normal vehicles!!!
     ##########################################
     # BELOW FUNCTIONS EXECUTE DECISIONS
 
-    def request_queueing(self):  # WHAT EXACTLY DOES THIS FUNCTION DO?
+    def request_queueing(self):
         while True:
             not_arrived_requests = [x for x in self.requests if x.mode is None]
             if len(not_arrived_requests) > 0:
-                # request = not_arrived_requests[0]
-                # interarrival_time = (request.arrival_period - self.env.now)
-                # yield self.env.timeout(interarrival_time)
-                # request.mode = 'Arrived'
-                # if self.multiple_power:
-                #     request.adjust_request_demand_based_on_pricing(self.price_pairs)
-                # self.env.process(self.assign_parking_charging_resources(request))
-                # self.env.process(self.request_process(request))
                 request = not_arrived_requests[0]
                 interarrival_time = request.arrival_period - self.env.now
                 yield self.env.timeout(interarrival_time)
