@@ -34,7 +34,7 @@ def perfect_info_charging_routing(
     mdl = Model("perfect_info_scaling")
     vehicle_range = []
     delta_time = 60
-    sim_duration = 5
+    sim_duration = 1
 
     for i in vehicles:
         vehicle_range.append(i.id)

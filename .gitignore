@@ -1,9 +1,30 @@
-/Utilities/raw_output/price_history_ACN_state9_week1_ACN.csv
-/Utilities/raw_output/requests_ACN_state9_week1_ACN.csv
-/Utilities/raw_output/storage_ACN_state9_week1_ACN.csv
-/Utilities/raw_output/training_results_pricing_double_capa_500_2_average_power_m_200_m_post_tuning.csv
-/Utilities/raw_output/training_results_pricing_double_tra_500_2_average_power_m_200_m_post_tuning.csv
-/Utilities/raw_output/load.csv
-/Utilities/raw_output/parking_data.csv
-/Utilities/raw_output/CSs_ACN_state9_week1_ACN_pricing_double_tra_500_2_average_power_m_200_m_post_tuning.csv
-/Utilities/raw_output/empty.py
+# IDE and environment files
+/.idea/
+/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Log files
+*.log
+
+# Data files
+*.csv
+*.pkl
+*.pstat
+
+# macOS files
+.DS_Store
+
+# Output directories
+/Utilities/raw_output/
+/Results/raw_output/
+/Cache/
+
+# Root level data files
+chargingdata.csv
+experience.csv
+file.csv
+investment_results_Facility_1_2019-06-03.csv
+investment_results_Facility_KoeBogen_2019-06-03.csv
