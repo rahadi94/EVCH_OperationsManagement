@@ -879,11 +879,8 @@ class Operator:  # we also need a class for normal vehicles!!!
                 t : t + self.planning_interval - 1
             ]["pv_generation"]
         )
-        # battery_charge = self.electric_storage.charge_yn * self.electric_storage.charging_power
-        # battery_discharge = self.electric_storage.discharge_yn * self.electric_storage.discharging_power
 
         planning_window_peak_load = charging_load + baseload_max - generation_min
-        # planning_window_peak_load = charging_load + baseload_max + battery_charge - generation_min - battery_discharge
         self.peak_load_history.append(planning_window_peak_load)
 
     def update_peak_load_history_inc_storage(self):
