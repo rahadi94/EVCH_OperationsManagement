@@ -1,5 +1,5 @@
 # Executes full simulation routine
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 from Utilities.sim_input_processing import sample_week
 from run_simulation import run_single_simulation
 

@@ -1,5 +1,5 @@
-from Environment.helper.configuration.configuration import Configuration
-from Environment.log import lg
+from resources.configuration.configuration import Configuration
+from resources.logging.log import lg
 from Infrastructure.grid import GridCapacity
 from Infrastructure.parking_lot import ParkingLot
 from Operations.operator import Operator

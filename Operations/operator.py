@@ -1,10 +1,10 @@
 import simpy
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 import Operations.ChargingAlgorithms as charge_algos
 import Operations.RoutingAlgorithms as route_algos
 import Operations.IntegratedAlgorithms as integrate_algos
 import Operations.StorageAlgorithms as store_algos
-from Environment.log import lg
+from resources.logging.log import lg
 import numpy as np
 import pandas as pd
 

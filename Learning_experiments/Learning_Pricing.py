@@ -1,14 +1,14 @@
-from Environment.helper.configuration.configuration import Configuration
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
+from resources.configuration.configuration import Configuration
+from Utilities.RL_Agents.agents.actor_critic_agents.SAC import (
     SAC,
 )
-from Environment.helper.configuration.SAC_configuration import (
+from resources.configuration.SAC_configuration import (
     config,
     pricing_config,
 )
 from Utilities.RL_environments.rl_pricing_env import PricingEnv
 from Utilities.sim_input_processing import sample_week
-from Environment.log import lg
+from resources.logging.log import lg
 import pandas as pd
 import numpy as np
 
@@ -56,7 +56,7 @@ def run_experiments():
     pricing_agent = SAC(pricing_config)
     training_results = pd.DataFrame([])
     episode = 1
-    NUMBER_EPISODES = 501
+    NUMBER_EPISODES = 21
     if Configuration.instance().pricing_mode == "perfect_info":
         NUMBER_EPISODES = 1
     output = []
@@ -146,8 +146,8 @@ def run_experiments():
         pricing_agent.episode_number += 1
         if not Configuration.instance().evaluation_after_training:
             training_results = pd.concat([training_results, df])
-            training_results.to_csv(
-                f"Utilities/raw_output/training_results_{pricing_agent.config.name}.csv"
+            training_results.to_csv(Configuration.instance().OUTPUT_DATA_PATH+
+                f"training_results_{pricing_agent.config.name}.csv"
             )
         output.append(df["profit"].values[0])
     # print(output)

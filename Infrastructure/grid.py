@@ -1,6 +1,6 @@
 import simpy
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 
 class GridCapacity:

@@ -1,7 +1,7 @@
 import simpy
 from simpy import Container
 
-from Environment.log import lg
+from resources.logging.log import lg
 
 
 class EVCharger:

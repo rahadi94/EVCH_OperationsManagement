@@ -6,12 +6,14 @@ from configparser import ConfigParser
 from pathlib import Path
 import pandas as pd
 import simpy
-from Environment.helper.configuration.configuration import Configuration
-from Environment.helper.logging.extra_default_filter import ExtraDefaultFilter
-from Environment.helper.logging.simulation_context_filter import SimulationContextFilter
-from Environment.log import lg
-from Environment.model import EVCC_Sim_Model
+from resources.configuration.configuration import Configuration
+from resources.logging.extra_default_filter import ExtraDefaultFilter
+from resources.logging.simulation_context_filter import SimulationContextFilter
+from resources.logging.log import lg
+from Simulation.model import EVCC_Sim_Model
 from Utilities.sim_input_processing import sample_week
+
+from Utilities.sim_input_processing import sample_training_and_test_weeks, sample_week
 
 
 
@@ -30,11 +32,12 @@ CACHE_PATH_WS = Configuration.instance().CACHE_PATH_WS
 OUTPUT_DATA_PATH = Configuration.instance().OUTPUT_DATA_PATH
 OUTPUT_VIZ_PATH = Configuration.instance().OUTPUT_VIZ_PATH
 
-TRAIN_WEEKS, TEST_WEEKS = Configuration.instance().TRAIN_WEEKS, Configuration.instance().TEST_WEEKS
+TRAIN_WEEKS, TEST_WEEKS = sample_training_and_test_weeks(seed=None)
 SIM_SEASON = Configuration.instance().SIM_SEASON
 SUMMER_START = Configuration.instance().SUMMER_START
 SUMMER_END = Configuration.instance().SUMMER_END
-SIM_START_DAY = Configuration.instance().SIM_START_DAY
+SIM_START_DAY = sample_week(
+            sim_seasons=SIM_SEASON, summer_start=SUMMER_START, summer_end=SUMMER_END, seed=42)
 SIM_DURATION = Configuration.instance().SIM_DURATION
 
 SIM_TIME = Configuration.instance().SIM_TIME

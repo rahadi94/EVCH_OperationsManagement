@@ -9,7 +9,7 @@ import Utilities.sim_input_processing as prep
 import warnings
 from matplotlib.backends.backend_pdf import PdfPages
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 warnings.filterwarnings("ignore", category=Warning)
 
@@ -34,8 +34,8 @@ def get_visuals(
     model,
     palette="mako",
     full_version=False,
-    raw_output_save_path="./Utilities/raw_output/",
-    visuals_save_path="./Utilities/visuals_output/",
+    raw_output_save_path=Configuration.instance().OUTPUT_DATA_PATH,
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
     sim_start_date="2019-06-03",
 ):
@@ -170,7 +170,7 @@ def get_visuals(
 def plot_general_population_properties(
     request_data,
     palette="mako",
-    visuals_save_path="./Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -290,7 +290,7 @@ def plot_general_population_properties(
 def plot_arrival_departure(
     request_data,
     palette="mako",
-    visuals_save_path="./Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
     full_version=False,
 ):
@@ -408,7 +408,7 @@ def plot_arrival_departure(
 def plot_occupancy(
     occupancy_data,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -486,7 +486,7 @@ def plot_occupancy(
 def plot_avg_daily_occupancy_by_tech(
     occupancy_data,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -571,7 +571,7 @@ def plot_combined_flexibility_indicators(
     request_data,
     palette="mako",
     full_version=False,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -693,7 +693,7 @@ def plot_energy_request_distribution(
     request_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
 
@@ -735,7 +735,7 @@ def plot_stay_duration_distribution(
     request_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -791,7 +791,7 @@ def plot_laxity_distribution(
     request_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -852,7 +852,7 @@ def plot_full_sim_horizon_combined_load_sink_curve(
     storage_load_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
     agent_name=Configuration.instance().pricing_agent_name,
 ):
@@ -939,7 +939,7 @@ def plot_full_sim_horizon_combined_load_sink_curve_high_peak_comparison(
     storage_load_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -1012,7 +1012,7 @@ def plot_full_sim_horizon_combined_load_sink_curve_all_pricing(
     storage_load_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -1088,7 +1088,7 @@ def plot_full_sim_horizon_charging_load_source_curve(
     charging_load_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -1146,7 +1146,7 @@ def plot_full_sim_horizon_combined_load_source_curve(
     grid_load_data,
     palette="mako",
     hue=None,
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
     agent_name=Configuration.instance().pricing_agent_name,
 ):
@@ -1216,7 +1216,7 @@ def plot_full_sim_horizon_combined_load_source_curve(
 def plot_avg_charging_load_curves(
     charging_load_data,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -1282,7 +1282,7 @@ def plot_avg_charging_load_curves(
 def plot_avg_load_source_and_sink_curves(
     combined_load_data,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     """
@@ -1412,7 +1412,7 @@ def plot_cs_occupancy_profile(
     df_charging_status,
     df_connection_status,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
 
@@ -1454,7 +1454,7 @@ def plot_cs_occupancy_profile(
 def plot_cs_utilization_energy(
     df_cs_utilization,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
 
@@ -1492,7 +1492,7 @@ def plot_cs_utilization_energy(
 def plot_service_level(
     request_data,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
 
@@ -1566,7 +1566,7 @@ def plot_service_level(
 
 # Plot historical prices
 def plot_historical_prices(
-    prices, palette="mako", visuals_save_path="Utilities/visuals_output/", post_fix=""
+    prices, palette="mako", visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH, post_fix=""
 ):
     set_plotting_style()
 
@@ -1598,7 +1598,7 @@ def plot_historical_prices(
 def plot_episodes_cumulative_rewards(
     df_episode_rewards,
     palette="mako",
-    visuals_save_path="Utilities/visuals_output/",
+    visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH,
     post_fix="",
 ):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 6), constrained_layout=True)

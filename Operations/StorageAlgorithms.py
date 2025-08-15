@@ -1,5 +1,5 @@
 # Contains algorithms for battery storage operations
-from Environment.log import lg
+from resources.logging.log import lg
 import numpy as np
 
 

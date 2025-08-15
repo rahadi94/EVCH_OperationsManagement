@@ -4,8 +4,6 @@ import sys
 import time
 from configparser import ConfigParser
 
-from Utilities.sim_input_processing import sample_training_and_test_weeks, sample_week
-
 
 class Configuration:
 
@@ -204,14 +202,14 @@ class Configuration:
         self.OUTPUT_DATA_PATH = parser_main.get("SETTINGS", "raw_output_save_path")
         self.OUTPUT_VIZ_PATH = parser_main.get("SETTINGS", "visuals_save_path")
 
-        self.TRAIN_WEEKS, self.TEST_WEEKS = sample_training_and_test_weeks(seed=None)
+        # self.TRAIN_WEEKS, self.TEST_WEEKS = sample_training_and_test_weeks(seed=None)
         self.SIM_SEASON = parser_main.get("ENVIRONMENT", "sim_season").split(",")
         self.SUMMER_START = parser_main.get("ENVIRONMENT", "summer_start_date")
         self.SUMMER_END = parser_main.get("ENVIRONMENT", "summer_end_date")
 
-        self.SIM_START_DAY = sample_week(
-            sim_seasons=self.SIM_SEASON, summer_start=self.SUMMER_START, summer_end=self.SUMMER_END, seed=42
-        )
+        # self.SIM_START_DAY = sample_week(
+        #     sim_seasons=self.SIM_SEASON, summer_start=self.SUMMER_START, summer_end=self.SUMMER_END, seed=42
+        # )
         self.SIM_DURATION = parser_main.getint("ENVIRONMENT", "sim_duration")
 
         self.SIM_TIME = self.SIM_DURATION * 24 * 60

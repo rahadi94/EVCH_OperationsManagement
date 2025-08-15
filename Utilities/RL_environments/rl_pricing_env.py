@@ -4,7 +4,7 @@ import numpy as np
 import logging
 import pandas as pd
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 k = 5
 

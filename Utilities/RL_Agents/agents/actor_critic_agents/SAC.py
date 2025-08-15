@@ -1,10 +1,10 @@
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.Base_Agent import (
+from Utilities.RL_Agents.agents.Base_Agent import (
     Base_Agent,
 )
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.utilities.OU_Noise import (
+from Utilities.RL_Agents.utilities.OU_Noise import (
     OU_Noise,
 )
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.utilities.data_structures.Replay_Buffer import (
+from Utilities.RL_Agents.utilities.data_structures.Replay_Buffer import (
     Replay_Buffer,
 )
 from torch.optim import Adam
@@ -551,5 +551,5 @@ class SAC(Base_Agent):
             # torch.save(self.critic_local.state_dict(), f'Results/critic_{self.config.name}')
             # torch.save(self.critic_local_2.state_dict(), f'Results/critic_2_{self.config.name}')
             torch.save(
-                self.actor_local.state_dict(), f"Results/actor_{self.config.name}"
+                self.actor_local.state_dict(), f"data/output/actor_{self.config.name}"
             )

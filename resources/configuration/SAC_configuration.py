@@ -1,9 +1,9 @@
 import argparse
 
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.utilities.data_structures.Config import (
+from Utilities.RL_Agents.utilities.data_structures.Config import (
     Config,
 )
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 config = Config()
 config.seed = False
