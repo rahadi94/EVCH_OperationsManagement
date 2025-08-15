@@ -13,6 +13,7 @@ __pycache__/
 *.csv
 *.pkl
 *.pstat
+*.pdf
 
 # macOS files
 .DS_Store
@@ -21,6 +22,7 @@ __pycache__/
 /Utilities/raw_output/
 /Results/raw_output/
 /Cache/
+/new_notebooks_EVCH/
 
 # Root level data files
 chargingdata.csv
@@ -28,3 +30,6 @@ experience.csv
 file.csv
 investment_results_Facility_1_2019-06-03.csv
 investment_results_Facility_KoeBogen_2019-06-03.csv
+
+!/Cache/pv_loads.pkl
+!/Cache/pv_loads.pkl

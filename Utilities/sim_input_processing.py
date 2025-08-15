@@ -10,6 +10,7 @@ import sklearn
 from sklearn.neighbors import KernelDensity
 #######################################################################################
 ### COMBINED ROUTINES
+from Environment.helper.configuration.configuration import Configuration
 from Environment.log import lg
 from Utilities.generate_random_demand import generate_random_demand
 
@@ -412,7 +413,7 @@ def get_sim_charging_requests(
         elif n_days and candidate_days and not limit_requests_to_capa:
 
             raise ValueError("Not Currently Implemented ")
-        parking_charging_preferences.to_csv('Utilities/raw_output/parking_data.csv')
+        parking_charging_preferences.to_csv(Configuration.instance().OUTPUT_DATA_PATH+'/parking_data.csv')
 
     return parking_charging_preferences
 

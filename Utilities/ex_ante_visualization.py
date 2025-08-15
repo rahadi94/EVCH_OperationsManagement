@@ -39,7 +39,7 @@ title_list = [
 
 
 def plot_full_sim_horizon_combined_load_sink_curve(
-    palette="mako", hue=None, visuals_save_path="visuals_output/", post_fix=""
+    palette="mako", hue=None, visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH, post_fix=""
 ):
     """
     Plots load curve in 1-timestep (i.e., 1 minute) resolution over entire sim horizon
@@ -137,7 +137,7 @@ def plot_full_sim_horizon_combined_load_sink_curve(
 
 
 def plot_full_sim_horizon_combined_load_source_curve(
-    palette="mako", hue=None, visuals_save_path="visuals_output/"
+    palette="mako", hue=None, visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH
 ):
     """
     Plots load curve in 1-timestep (i.e., 1 minute) resolution over entire sim horizon
@@ -218,7 +218,7 @@ def plot_full_sim_horizon_combined_load_source_curve(
 
 
 def plot_full_sim_horizon_combined_load_source_curve_4(
-    palette="mako", hue=None, visuals_save_path="visuals_output/"
+    palette="mako", hue=None, visuals_save_path=Configuration.instance().OUTPUT_VIZ_PATH
 ):
     """
     Plots load curve in 1-timestep (i.e., 1 minute) resolution over entire sim horizon
