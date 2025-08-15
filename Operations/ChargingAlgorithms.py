@@ -1,8 +1,8 @@
 import numpy as np
 from docplex.mp.model import Model
 
-from Environment.helper.configuration.configuration import Configuration
-from Environment.log import lg
+from resources.configuration.configuration import Configuration
+from resources.logging.log import lg
 
 
 # Uncontrolled charging (ignores all infrastructure)

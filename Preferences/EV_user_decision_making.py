@@ -1,7 +1,7 @@
 # First party modules
 # from pyoptsparse import SLSQP, Optimization
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 power_degree = Configuration.instance().degree_of_power_in_price_function
 

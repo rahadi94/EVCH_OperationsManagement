@@ -1,7 +1,7 @@
-from Environment.log import lg
+from resources.logging.log import lg
 import numpy as np
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 from Preferences.EV_user_decision_making import ev_decision_making
 import pandas as pd
 

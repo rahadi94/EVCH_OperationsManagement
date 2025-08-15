@@ -1,14 +1,14 @@
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
     SAC,
 )
-from Environment.helper.configuration.SAC_configuration import (
+from resources.configuration.SAC_configuration import (
     config,
     pricing_config,
 )
 from Utilities.RL_environments.rl_pricing_env import PricingEnv
 from Utilities.sim_input_processing import sample_week
-from Environment.log import lg
+from resources.logging.log import lg
 import pandas as pd
 import numpy as np
 

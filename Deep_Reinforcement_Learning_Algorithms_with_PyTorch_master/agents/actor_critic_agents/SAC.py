@@ -551,5 +551,5 @@ class SAC(Base_Agent):
             # torch.save(self.critic_local.state_dict(), f'Results/critic_{self.config.name}')
             # torch.save(self.critic_local_2.state_dict(), f'Results/critic_2_{self.config.name}')
             torch.save(
-                self.actor_local.state_dict(), f"Results/actor_{self.config.name}"
+                self.actor_local.state_dict(), f"data/output/actor_{self.config.name}"
             )

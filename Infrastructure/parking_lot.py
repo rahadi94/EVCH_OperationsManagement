@@ -1,6 +1,6 @@
 import simpy
 from simpy import Resource
-from Environment.log import lg
+from resources.logging.log import lg
 
 
 class ParkingLot:

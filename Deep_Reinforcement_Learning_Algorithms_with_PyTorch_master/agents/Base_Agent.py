@@ -6,7 +6,7 @@ import random
 import numpy as np
 import torch
 import time
-from Environment.log import lg
+from resources.logging.log import lg
 
 # import tensorflow as tf
 from nn_builder.pytorch.NN import NN

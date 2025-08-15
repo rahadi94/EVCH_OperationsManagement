@@ -6,11 +6,11 @@ from configparser import ConfigParser
 from pathlib import Path
 import pandas as pd
 import simpy
-from Environment.helper.configuration.configuration import Configuration
-from Environment.helper.logging.extra_default_filter import ExtraDefaultFilter
-from Environment.helper.logging.simulation_context_filter import SimulationContextFilter
-from Environment.log import lg
-from Environment.model import EVCC_Sim_Model
+from resources.configuration.configuration import Configuration
+from resources.logging.extra_default_filter import ExtraDefaultFilter
+from resources.logging.simulation_context_filter import SimulationContextFilter
+from resources.logging.log import lg
+from Simulation.model import EVCC_Sim_Model
 from Utilities.sim_input_processing import sample_week
 
 from Utilities.sim_input_processing import sample_training_and_test_weeks, sample_week

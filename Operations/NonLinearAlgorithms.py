@@ -2,7 +2,7 @@
 # from pyoptsparse import SLSQP, Optimization, pyOpt_objective
 import numpy as np
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 from scipy.optimize import minimize
 import numpy as np
 

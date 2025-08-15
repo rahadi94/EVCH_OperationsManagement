@@ -1,7 +1,7 @@
-from Environment.log import lg
+from resources.logging.log import lg
 from docplex.mp.model import Model
 import numpy as np
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 
 # TODO: myopic and multi-period optimal routing and charging (as implemented in ICIS paper but with specified lookahead window (e.g., 8 planning periods, which is 2h))

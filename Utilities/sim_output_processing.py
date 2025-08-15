@@ -4,7 +4,7 @@ import random
 import pandas as pd
 from datetime import timedelta
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 
 def get_requests(raw_output_save_path, post_fix=""):

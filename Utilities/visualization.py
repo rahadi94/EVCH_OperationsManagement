@@ -9,7 +9,7 @@ import Utilities.sim_input_processing as prep
 import warnings
 from matplotlib.backends.backend_pdf import PdfPages
 
-from Environment.helper.configuration.configuration import Configuration
+from resources.configuration.configuration import Configuration
 
 warnings.filterwarnings("ignore", category=Warning)
 

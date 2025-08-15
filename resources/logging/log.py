@@ -1,6 +1,6 @@
 import logging
 
-from Environment.helper.logging.simulation_context_filter import SimulationContextFilter
+from resources.logging.simulation_context_filter import SimulationContextFilter
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s] [Time %(env_time)10s] [%(clazz)30s %(oid)3s]: %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')

@@ -1,4 +1,4 @@
-from Environment.log import lg
+from resources.logging.log import lg
 import random
 
 

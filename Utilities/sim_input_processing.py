@@ -10,8 +10,8 @@ import sklearn
 from sklearn.neighbors import KernelDensity
 #######################################################################################
 ### COMBINED ROUTINES
-from Environment.helper.configuration.configuration import Configuration
-from Environment.log import lg
+from resources.configuration.configuration import Configuration
+from resources.logging.log import lg
 from Utilities.generate_random_demand import generate_random_demand
 
 
