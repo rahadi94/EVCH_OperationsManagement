@@ -1,18 +1,18 @@
 from resources.configuration.configuration import Configuration
 from resources.logging.log import lg
-from Infrastructure.grid import GridCapacity
-from Infrastructure.parking_lot import ParkingLot
-from Operations.operator import Operator
+from Simulation.Infrastructure.grid import GridCapacity
+from Simulation.Infrastructure.parking_lot import ParkingLot
+from Simulation.Operations.operator import Operator
 import pandas as pd
-from Infrastructure.ev_charger import EVCharger
-from Infrastructure.electric_generator import NonDispatchableGenerator
-from Infrastructure.electric_storage import ElectricStorage
+from Simulation.Infrastructure.ev_charger import EVCharger
+from Simulation.Infrastructure.electric_generator import NonDispatchableGenerator
+from Simulation.Infrastructure.electric_storage import ElectricStorage
 import Utilities.visualization as viz
 import Utilities.sim_input_processing as prep
 
 # NOTE: unit sim time is defined as 1 minute real time!
 # from Preferences.request_generator import RequestGenerator
-from Preferences.vehicle import Vehicle
+from Simulation.Preferences.vehicle import Vehicle
 import numpy as np
 
 class EVCC_Sim_Model:

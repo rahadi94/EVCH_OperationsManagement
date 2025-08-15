@@ -1,15 +1,15 @@
 import simpy
 from resources.configuration.configuration import Configuration
-import Operations.ChargingAlgorithms as charge_algos
-import Operations.RoutingAlgorithms as route_algos
-import Operations.IntegratedAlgorithms as integrate_algos
-import Operations.StorageAlgorithms as store_algos
+import Simulation.Operations.ChargingAlgorithms as charge_algos
+import Simulation.Operations.RoutingAlgorithms as route_algos
+import Simulation.Operations.IntegratedAlgorithms as integrate_algos
+import Simulation.Operations.StorageAlgorithms as store_algos
 from resources.logging.log import lg
 import numpy as np
 import pandas as pd
 
-from Operations.NonLinearAlgorithms import nonlinear_pricing
-from Operations.Operator_utils import get_exp_free_grid_capacity_utility
+from Simulation.Operations.NonLinearAlgorithms import nonlinear_pricing
+from Simulation.Operations.Operator_utils import get_exp_free_grid_capacity_utility
 from Utilities.RL_environments.rl_pricing_env import convert_to_vector
 
 
