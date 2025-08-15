@@ -1,5 +1,5 @@
 from resources.configuration.configuration import Configuration
-from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
+from Utilities.RL_Agents.agents.actor_critic_agents.SAC import (
     SAC,
 )
 from resources.configuration.SAC_configuration import (
