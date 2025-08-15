@@ -2,7 +2,7 @@ from resources.logging.log import lg
 import numpy as np
 
 from resources.configuration.configuration import Configuration
-from Preferences.EV_user_decision_making import ev_decision_making
+from Simulation.Preferences.EV_user_decision_making import ev_decision_making
 import pandas as pd
 
 class Vehicle:
