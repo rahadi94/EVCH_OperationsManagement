@@ -92,11 +92,50 @@ class EVCC_Sim_Model:
     @staticmethod
     def init(
         env: Any,
-        search_engine: Any,
-        payment_engine: Any,
-        vehicle_assignment_engine: Any,
-        vehicle_choice_behavior: Any,
-        population_factory: Any,
+        base_path: str,
+        raw_output_save_path: str,
+        visuals_save_path: str,
+        cache_path: str,
+        post_fix: str,
+        sim_season: str,
+        sim_start_date: str,
+        day_types: List[str],
+        sim_duration: int,
+        facility_list: List[str],
+        ev_share: float,
+        demand_gen_approach: str,
+        geography: str,
+        limit_requests_to_capa: bool,
+        parking_capa: int,
+        grid_capa: float,
+        transformer_num: int,
+        charging_capa: Union[float, Dict[str, float]],
+        min_facility_baseload: float,
+        max_facility_baseload: float,
+        installed_capa_PV: float,
+        installed_storage: float,
+        charging_num: Union[int, Dict[str, int]],
+        connector_num: int,
+        electricity_tariff: List[float],
+        prices: Dict[str, float],
+        year: int,
+        planning_interval: int,
+        optimization_period_length: int,
+        lookahead: int,
+        lookback: int,
+        routing_algo: str,
+        charging_algo: str,
+        storage_algo: str,
+        scheduling_mode: str,
+        service_level: float,
+        minimum_served_demand: float,
+        penalty_for_missed_kWh: float,
+        planning: bool,
+        objective: str,
+        charging_agent: Optional[Any] = None,
+        storage_agent: Optional[Any] = None,
+        pricing_agent: Optional[Any] = None,
+        chargers_type: str = "single",
         reset: bool = False,
     ) -> "EVCC_Sim_Model":
         """
@@ -104,11 +143,50 @@ class EVCC_Sim_Model:
         
         Args:
             env: SimPy environment
-            search_engine: Search engine for vehicle routing
-            payment_engine: Payment processing engine
-            vehicle_assignment_engine: Vehicle assignment engine
-            vehicle_choice_behavior: Vehicle choice behavior model
-            population_factory: Population factory for generating vehicles
+            base_path: Base path for data files
+            raw_output_save_path: Path for raw output data
+            visuals_save_path: Path for visualization outputs
+            cache_path: Path for cached data
+            post_fix: Postfix for file naming
+            sim_season: Simulation season
+            sim_start_date: Simulation start date
+            day_types: List of day types
+            sim_duration: Simulation duration in days
+            facility_list: List of facility IDs
+            ev_share: Electric vehicle share
+            demand_gen_approach: Demand generation approach
+            geography: Geographic region
+            limit_requests_to_capa: Whether to limit requests to capacity
+            parking_capa: Parking capacity
+            grid_capa: Grid capacity
+            transformer_num: Number of transformers
+            charging_capa: Charging capacity
+            min_facility_baseload: Minimum facility base load
+            max_facility_baseload: Maximum facility base load
+            installed_capa_PV: Installed PV capacity
+            installed_storage: Installed storage capacity
+            charging_num: Number of chargers
+            connector_num: Number of connectors
+            electricity_tariff: Electricity tariff
+            prices: Price configuration
+            year: Simulation year
+            planning_interval: Planning interval
+            optimization_period_length: Optimization period length
+            lookahead: Lookahead periods
+            lookback: Lookback periods
+            routing_algo: Routing algorithm
+            charging_algo: Charging algorithm
+            storage_algo: Storage algorithm
+            scheduling_mode: Scheduling mode
+            service_level: Service level
+            minimum_served_demand: Minimum served demand
+            penalty_for_missed_kWh: Penalty for missed kWh
+            planning: Whether planning is enabled
+            objective: Objective function
+            charging_agent: Charging agent
+            storage_agent: Storage agent
+            pricing_agent: Pricing agent
+            chargers_type: Type of chargers
             reset: Whether to reset the singleton instance
             
         Returns:
@@ -116,24 +194,62 @@ class EVCC_Sim_Model:
         """
         if EVCC_Sim_Model.__instance is None or reset is True:
             EVCC_Sim_Model(
-                env,
-                search_engine,
-                payment_engine,
-                vehicle_assignment_engine,
-                vehicle_choice_behavior,
-                population_factory,
-                reset,
+                env=env,
+                base_path=base_path,
+                raw_output_save_path=raw_output_save_path,
+                visuals_save_path=visuals_save_path,
+                cache_path=cache_path,
+                post_fix=post_fix,
+                sim_season=sim_season,
+                sim_start_date=sim_start_date,
+                day_types=day_types,
+                sim_duration=sim_duration,
+                facility_list=facility_list,
+                ev_share=ev_share,
+                demand_gen_approach=demand_gen_approach,
+                geography=geography,
+                limit_requests_to_capa=limit_requests_to_capa,
+                parking_capa=parking_capa,
+                grid_capa=grid_capa,
+                transformer_num=transformer_num,
+                charging_capa=charging_capa,
+                min_facility_baseload=min_facility_baseload,
+                max_facility_baseload=max_facility_baseload,
+                installed_capa_PV=installed_capa_PV,
+                installed_storage=installed_storage,
+                charging_num=charging_num,
+                connector_num=connector_num,
+                electricity_tariff=electricity_tariff,
+                prices=prices,
+                year=year,
+                planning_interval=planning_interval,
+                optimization_period_length=optimization_period_length,
+                lookahead=lookahead,
+                lookback=lookback,
+                routing_algo=routing_algo,
+                charging_algo=charging_algo,
+                storage_algo=storage_algo,
+                scheduling_mode=scheduling_mode,
+                service_level=service_level,
+                minimum_served_demand=minimum_served_demand,
+                penalty_for_missed_kWh=penalty_for_missed_kWh,
+                planning=planning,
+                objective=objective,
+                charging_agent=charging_agent,
+                storage_agent=storage_agent,
+                pricing_agent=pricing_agent,
+                chargers_type=chargers_type,
             )
         return EVCC_Sim_Model.__instance
 
     def __init__(
         self,
+        env: Any,
         base_path: str,
         raw_output_save_path: str,
         visuals_save_path: str,
         cache_path: str,
         post_fix: str,
-        env: Any,
         sim_season: str,
         sim_start_date: str,
         day_types: List[str],
