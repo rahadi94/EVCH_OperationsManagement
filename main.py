@@ -33,7 +33,7 @@ def run_experiments():
         "slow_four": 0,
     }
 
-    df = run_single_simulation(
+    run_single_simulation(
         charging_agent=None,
         storage_agent=None,
         pricing_agent=None,
@@ -45,8 +45,7 @@ def run_experiments():
         storage_capa=STORAGE_CAPA,
         pv_capa=PV_CAPA,
         year=9,
-        start_day=START,
-    )
-    return df
+        start_day=START)
+    
 
 run_experiments()

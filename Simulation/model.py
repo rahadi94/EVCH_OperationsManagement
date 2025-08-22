@@ -9,35 +9,111 @@ from Simulation.Infrastructure.electric_generator import NonDispatchableGenerato
 from Simulation.Infrastructure.electric_storage import ElectricStorage
 import Utilities.visualization as viz
 import Utilities.sim_input_processing as prep
+import numpy as np
+from typing import List, Dict, Any, Optional, Union
+from dataclasses import dataclass
 
 # NOTE: unit sim time is defined as 1 minute real time!
-# from Preferences.request_generator import RequestGenerator
 from Simulation.Preferences.vehicle import Vehicle
-import numpy as np
+
+
+@dataclass
+class SimulationConfig:
+    """Configuration data for simulation parameters."""
+    base_path: str
+    raw_output_save_path: str
+    visuals_save_path: str
+    cache_path: str
+    post_fix: str
+    sim_season: str
+    sim_start_date: str
+    day_types: List[str]
+    sim_duration: int
+    facility_list: List[str]
+    ev_share: float
+    demand_gen_approach: str
+    geography: str
+    limit_requests_to_capa: bool
+    year: int
+
+
+@dataclass
+class InfrastructureConfig:
+    """Configuration data for infrastructure parameters."""
+    parking_capa: int
+    grid_capa: float
+    transformer_num: int
+    charging_capa: Union[float, Dict[str, float]]
+    min_facility_baseload: float
+    max_facility_baseload: float
+    installed_capa_PV: float
+    installed_storage: float
+    charging_num: Union[int, Dict[str, int]]
+    connector_num: int
+    chargers_type: str
+
+
+@dataclass
+class OperationsConfig:
+    """Configuration data for operations parameters."""
+    planning_interval: int
+    optimization_period_length: int
+    lookahead: int
+    lookback: int
+    routing_algo: str
+    charging_algo: str
+    storage_algo: str
+    scheduling_mode: str
+    service_level: float
+    minimum_served_demand: float
+    penalty_for_missed_kWh: float
+    planning: bool
+    objective: str
+
 
 class EVCC_Sim_Model:
-    # There is only one instance of this class.
+    """
+    Main simulation model for Electric Vehicle Charging Center (EVCC).
+    
+    This class implements the singleton pattern and manages the entire simulation
+    including infrastructure, vehicles, and operations.
+    """
+    
+    # Singleton instance
     __instance = None
 
     @staticmethod
     def instance() -> "EVCC_Sim_Model":
-        """Static access method."""
+        """Get the singleton instance of the simulation model."""
         if EVCC_Sim_Model.__instance is None:
             raise Exception("World was not initialized")
-        else:
-            return EVCC_Sim_Model.__instance
+        return EVCC_Sim_Model.__instance
 
     @staticmethod
     def init(
-        env,
-        search_engine,
-        payment_engine,
-        vehicle_assignment_engine,
-        vehicle_choice_behavior,
-        population_factory,
-        reset=False,
-    ):
-        """Static access method."""
+        env: Any,
+        search_engine: Any,
+        payment_engine: Any,
+        vehicle_assignment_engine: Any,
+        vehicle_choice_behavior: Any,
+        population_factory: Any,
+        reset: bool = False,
+    ) -> "EVCC_Sim_Model":
+        """
+        Initialize the singleton instance of the simulation model.
+        
+        Args:
+            env: SimPy environment
+            search_engine: Search engine for vehicle routing
+            payment_engine: Payment processing engine
+            vehicle_assignment_engine: Vehicle assignment engine
+            vehicle_choice_behavior: Vehicle choice behavior model
+            population_factory: Population factory for generating vehicles
+            reset: Whether to reset the singleton instance
+            
+        Returns:
+            EVCC_Sim_Model: The singleton instance
+        """
         if EVCC_Sim_Model.__instance is None or reset is True:
             EVCC_Sim_Model(
                 env,
@@ -52,94 +128,302 @@ class EVCC_Sim_Model:
 
     def __init__(
         self,
-        base_path,
-        raw_output_save_path,
-        visuals_save_path,
-        cache_path,
-        post_fix,
-        env,
-        sim_season,
-        sim_start_date,
-        day_types,
-        sim_duration,
-        facility_list,
-        ev_share,
-        demand_gen_approach,
-        geography,
-        limit_requests_to_capa,
-        parking_capa,
-        grid_capa,
-        transformer_num,
-        charging_capa,
-        min_facility_baseload,
-        max_facility_baseload,
-        installed_capa_PV,
-        installed_storage,
-        charging_num,
-        connector_num,
-        electricity_tariff,
-        prices,
-        year,
-        planning_interval,
-        optimization_period_length,
-        lookahead,
-        lookback,
-        routing_algo,
-        charging_algo,
-        storage_algo,
-        scheduling_mode,
-        service_level,
-        minimum_served_demand,
-        penalty_for_missed_kWh,
-        planning,
-        objective,
-        charging_agent,
-        storage_agent,
-        pricing_agent,
-        chargers_type="single",
+        base_path: str,
+        raw_output_save_path: str,
+        visuals_save_path: str,
+        cache_path: str,
+        post_fix: str,
+        env: Any,
+        sim_season: str,
+        sim_start_date: str,
+        day_types: List[str],
+        sim_duration: int,
+        facility_list: List[str],
+        ev_share: float,
+        demand_gen_approach: str,
+        geography: str,
+        limit_requests_to_capa: bool,
+        parking_capa: int,
+        grid_capa: float,
+        transformer_num: int,
+        charging_capa: Union[float, Dict[str, float]],
+        min_facility_baseload: float,
+        max_facility_baseload: float,
+        installed_capa_PV: float,
+        installed_storage: float,
+        charging_num: Union[int, Dict[str, int]],
+        connector_num: int,
+        electricity_tariff: List[float],
+        prices: Dict[str, float],
+        year: int,
+        planning_interval: int,
+        optimization_period_length: int,
+        lookahead: int,
+        lookback: int,
+        routing_algo: str,
+        charging_algo: str,
+        storage_algo: str,
+        scheduling_mode: str,
+        service_level: float,
+        minimum_served_demand: float,
+        penalty_for_missed_kWh: float,
+        planning: bool,
+        objective: str,
+        charging_agent: Optional[Any] = None,
+        storage_agent: Optional[Any] = None,
+        pricing_agent: Optional[Any] = None,
+        chargers_type: str = "single",
     ):
+        """
+        Initialize the EVCC simulation model.
+        
+        Args:
+            base_path: Base path for data files
+            raw_output_save_path: Path for raw output data
+            visuals_save_path: Path for visualization outputs
+            cache_path: Path for cached data
+            post_fix: Postfix for file naming
+            env: SimPy environment
+            sim_season: Simulation season
+            sim_start_date: Simulation start date
+            day_types: List of day types
+            sim_duration: Simulation duration in days
+            facility_list: List of facility IDs
+            ev_share: Electric vehicle share
+            demand_gen_approach: Demand generation approach
+            geography: Geographic region
+            limit_requests_to_capa: Whether to limit requests to capacity
+            parking_capa: Parking capacity
+            grid_capa: Grid capacity
+            transformer_num: Number of transformers
+            charging_capa: Charging capacity
+            min_facility_baseload: Minimum facility base load
+            max_facility_baseload: Maximum facility base load
+            installed_capa_PV: Installed PV capacity
+            installed_storage: Installed storage capacity
+            charging_num: Number of chargers
+            connector_num: Number of connectors
+            electricity_tariff: Electricity tariff
+            prices: Price configuration
+            year: Simulation year
+            planning_interval: Planning interval
+            optimization_period_length: Optimization period length
+            lookahead: Lookahead periods
+            lookback: Lookback periods
+            routing_algo: Routing algorithm
+            charging_algo: Charging algorithm
+            storage_algo: Storage algorithm
+            scheduling_mode: Scheduling mode
+            service_level: Service level
+            minimum_served_demand: Minimum served demand
+            penalty_for_missed_kWh: Penalty for missed kWh
+            planning: Whether planning is enabled
+            objective: Objective function
+            charging_agent: Charging agent
+            storage_agent: Storage agent
+            pricing_agent: Pricing agent
+            chargers_type: Type of chargers
+        """
+        # Set singleton instance
+        EVCC_Sim_Model.__instance = self
+        
+        # Initialize configuration objects
+        self._init_simulation_config(
+            base_path, raw_output_save_path, visuals_save_path, cache_path, post_fix,
+            sim_season, sim_start_date, day_types, sim_duration, facility_list,
+            ev_share, demand_gen_approach, geography, limit_requests_to_capa, year
+        )
+        
+        self._init_infrastructure_config(
+            parking_capa, grid_capa, transformer_num, charging_capa,
+            min_facility_baseload, max_facility_baseload, installed_capa_PV,
+            installed_storage, charging_num, connector_num, chargers_type
+        )
+        
+        self._init_operations_config(
+            planning_interval, optimization_period_length, lookahead, lookback,
+            routing_algo, charging_algo, storage_algo, scheduling_mode,
+            service_level, minimum_served_demand, penalty_for_missed_kWh,
+            planning, objective
+        )
+        
+        # Initialize simulation environment
+        self._init_simulation_environment(env, electricity_tariff, prices)
+        
+        # Initialize infrastructure and data
+        self._init_infrastructure_and_data()
+        
+        # Initialize operations
+        self._init_operations(charging_agent, storage_agent, pricing_agent)
 
-        self.random_demand = Configuration.instance().random_demand
-        self.data_source = Configuration.instance().data_source
-        self.planning = planning
-        self.objective = objective
-        # path settings
+    def _init_simulation_config(
+        self,
+        base_path: str,
+        raw_output_save_path: str,
+        visuals_save_path: str,
+        cache_path: str,
+        post_fix: str,
+        sim_season: str,
+        sim_start_date: str,
+        day_types: List[str],
+        sim_duration: int,
+        facility_list: List[str],
+        ev_share: float,
+        demand_gen_approach: str,
+        geography: str,
+        limit_requests_to_capa: bool,
+        year: int
+    ) -> None:
+        """Initialize simulation configuration parameters."""
+        self.sim_config = SimulationConfig(
+            base_path=base_path,
+            raw_output_save_path=raw_output_save_path,
+            visuals_save_path=visuals_save_path,
+            cache_path=cache_path,
+            post_fix=post_fix,
+            sim_season=sim_season,
+            sim_start_date=sim_start_date,
+            day_types=day_types,
+            sim_duration=sim_duration,
+            facility_list=facility_list,
+            ev_share=ev_share,
+            demand_gen_approach=demand_gen_approach,
+            geography=geography,
+            limit_requests_to_capa=limit_requests_to_capa,
+            year=year
+        )
+        
+        # Set instance attributes for backward compatibility
         self.base_path = base_path
         self.raw_output_save_path = raw_output_save_path
         self.post_fix = post_fix
         self.visuals_save_path = visuals_save_path
         self.cache_path = cache_path
-        # sim/env parameter settings
-        self.env = env
         self.sim_season = sim_season
         self.sim_start_date = sim_start_date
         self.day_types = day_types
-        self.sim_duration = sim_duration  # in days
-        self.sim_time = sim_duration * 24 * 60  # in minutes
+        self.sim_duration = sim_duration
         self.facility_list = facility_list
         self.ev_share = ev_share
         self.geography = geography
         self.demand_gen_approach = demand_gen_approach
-        self.limit_requests_to_capa = limit_requests_to_capa  # boolean of whether the limit parking requests to parking capacizy
-        self.planning_interval = planning_interval  # at which intervals (in unit sim time) to do the routing/charging re-planning
-        self.optimization_period_length = optimization_period_length  # how long a period is in the optimization (in unit sim time)
-        self.lookahead = lookahead  # how many optimization periods ops algo looks ahead
-        self.lookback = lookback  # how many pre-sim periods to include in data retrieval (this is the history)
-        self.electricity_tariff = electricity_tariff
+        self.limit_requests_to_capa = limit_requests_to_capa
         self.year = year
-        self.prices = prices
-        self.prices["peak"] = Configuration.instance().peak_cost
-        # infrastucture settings
+
+    def _init_infrastructure_config(
+        self,
+        parking_capa: int,
+        grid_capa: float,
+        transformer_num: int,
+        charging_capa: Union[float, Dict[str, float]],
+        min_facility_baseload: float,
+        max_facility_baseload: float,
+        installed_capa_PV: float,
+        installed_storage: float,
+        charging_num: Union[int, Dict[str, int]],
+        connector_num: int,
+        chargers_type: str
+    ) -> None:
+        """Initialize infrastructure configuration parameters."""
+        self.infrastructure_config = InfrastructureConfig(
+            parking_capa=parking_capa,
+            grid_capa=grid_capa,
+            transformer_num=transformer_num,
+            charging_capa=charging_capa,
+            min_facility_baseload=min_facility_baseload,
+            max_facility_baseload=max_facility_baseload,
+            installed_capa_PV=installed_capa_PV,
+            installed_storage=installed_storage,
+            charging_num=charging_num,
+            connector_num=connector_num,
+            chargers_type=chargers_type
+        )
+        
+        # Set instance attributes for backward compatibility
         self.chargers_type = chargers_type
         self.charging_capa = charging_capa
         self.charging_num = charging_num
-        if chargers_type in ["single"]:
-            self.charging_capa = charging_capa["fast"]
-            self.charging_num = charging_num["fast_one"]
         self.connector_num = connector_num
         self.min_facility_baseload = min_facility_baseload
         self.max_facility_baseload = max_facility_baseload
         self.parking_capa = parking_capa
+        self.transformer_num = transformer_num
+        self.grid_capa = grid_capa + transformer_num * 200  # in kW
+        self.installed_capa_PV = installed_capa_PV
+        self.storage_capacity = installed_storage
+
+    def _init_operations_config(
+        self,
+        planning_interval: int,
+        optimization_period_length: int,
+        lookahead: int,
+        lookback: int,
+        routing_algo: str,
+        charging_algo: str,
+        storage_algo: str,
+        scheduling_mode: str,
+        service_level: float,
+        minimum_served_demand: float,
+        penalty_for_missed_kWh: float,
+        planning: bool,
+        objective: str
+    ) -> None:
+        """Initialize operations configuration parameters."""
+        self.operations_config = OperationsConfig(
+            planning_interval=planning_interval,
+            optimization_period_length=optimization_period_length,
+            lookahead=lookahead,
+            lookback=lookback,
+            routing_algo=routing_algo,
+            charging_algo=charging_algo,
+            storage_algo=storage_algo,
+            scheduling_mode=scheduling_mode,
+            service_level=service_level,
+            minimum_served_demand=minimum_served_demand,
+            penalty_for_missed_kWh=penalty_for_missed_kWh,
+            planning=planning,
+            objective=objective
+        )
+        
+        # Set instance attributes for backward compatibility
+        self.planning_interval = planning_interval
+        self.optimization_period_length = optimization_period_length
+        self.lookahead = lookahead
+        self.lookback = lookback
+        self.routing_algo = routing_algo
+        self.charging_algo = charging_algo
+        self.storage_algo = storage_algo
+        self.scheduling_mode = scheduling_mode
+        self.service_level = service_level
+        self.minimum_served_demand = minimum_served_demand
+        self.penalty_for_missed_kWh = penalty_for_missed_kWh
+        self.planning = planning
+        self.objective = objective
+
+    def _init_simulation_environment(
+        self,
+        env: Any,
+        electricity_tariff: List[float],
+        prices: Dict[str, float]
+    ) -> None:
+        """Initialize simulation environment and basic parameters."""
+        self.env = env
+        self.sim_time = self.sim_duration * 24 * 60  # in minutes
+        self.electricity_tariff = electricity_tariff
+        self.prices = prices.copy()
+        self.prices["peak"] = Configuration.instance().peak_cost
+        
+        # Load configuration
+        config = Configuration.instance()
+        self.random_demand = config.random_demand
+        self.data_source = config.data_source
+        self.benchmarking = config.benchmarking
+        self.dynamic_pricing = config.dynamic_pricing
+        self.peak_threshold = config.peak_threshold
+
+    def _init_infrastructure_and_data(self) -> None:
+        """Initialize infrastructure components and load data."""
+        # Load base load data
         self.base_load = prep.get_sim_baseload_curve(
             base_path=self.base_path,
             cache_path=self.cache_path,
@@ -149,12 +433,8 @@ class EVCC_Sim_Model:
             min_facility_baseload=self.min_facility_baseload,
             max_facility_baseload=self.max_facility_baseload,
         )
-        self.transformer_num = transformer_num  # Number
-        self.grid_capa = grid_capa + transformer_num * 200  # in Kw
-        self.installed_capa_PV = installed_capa_PV  # in kW
-        self.storage_capacity = installed_storage  # in kWh
-
-        # charging requests
+        
+        # Load charging request data
         self.request_data = prep.get_sim_charging_requests(
             base_path=self.base_path,
             cache_path=self.cache_path,
@@ -172,26 +452,26 @@ class EVCC_Sim_Model:
             data_source=self.data_source,
             random_demand=self.random_demand
         )
-        # self.demand_factory = None#RequestGenerator(self.env)
-        self.benchmarking = Configuration.instance().benchmarking
-        self.requests = self.EVCC_sim_setup(
-            self.request_data
-        )  # vehicles are the requests
-        # ops settings
-        self.routing_algo = routing_algo
-        self.charging_algo = charging_algo
-        self.storage_algo = storage_algo
-        self.scheduling_mode = scheduling_mode
+        
+        # Setup simulation
+        self.requests = self.EVCC_sim_setup(self.request_data)
+
+    def _init_operations(
+        self,
+        charging_agent: Optional[Any],
+        storage_agent: Optional[Any],
+        pricing_agent: Optional[Any]
+    ) -> None:
+        """Initialize operations and agents."""
+        # Initialize costs and rewards
         self.costs = dict(investment=0, operations=0)
-        self.service_level = 0
-        self.minimum_served_demand = minimum_served_demand
-        self.penalty_for_missed_kWh = penalty_for_missed_kWh
         self.objective_function = 0
         self.total_energy_charged = 0
         self.reward = dict(costs=0, missed=0, feasibility=0, feasibility_storage=0)
-        self.dynamic_pricing = Configuration.instance().dynamic_pricing
+        
+        # Create operator
         self.operator = Operator(
-            env=env,
+            env=self.env,
             requests=self.requests,
             chargers=self.chargers,
             routing_strategy=self.routing_algo,
@@ -203,7 +483,7 @@ class EVCC_Sim_Model:
             electric_storage=self.electric_storage,
             sim_time=self.sim_time,
             electricity_tariff=self.electricity_tariff,
-            connector_num=connector_num,
+            connector_num=self.connector_num,
             parking_spots=self.parking_spots,
             baseload=self.base_load,
             max_facility_baseload=self.max_facility_baseload,
@@ -211,46 +491,69 @@ class EVCC_Sim_Model:
             optimization_period_length=self.optimization_period_length,
             num_lookahead_planning_periods=self.lookahead,
             num_lookback_periods=self.lookback,
-            service_level=service_level,
+            service_level=self.service_level,
             charging_hub=self,
-            minimum_served_demand=minimum_served_demand,
+            minimum_served_demand=self.minimum_served_demand,
         )
-        # decision-making agents
+        
+        # Initialize agents
+        self._init_agents(charging_agent, storage_agent, pricing_agent)
+
+    def _init_agents(
+        self,
+        charging_agent: Optional[Any],
+        storage_agent: Optional[Any],
+        pricing_agent: Optional[Any]
+    ) -> None:
+        """Initialize decision-making agents."""
         self.charging_agent = charging_agent
+        self.storage_agent = storage_agent
+        self.pricing_agent = pricing_agent
+        
+        # Setup charging agent
         if self.charging_agent:
             self.charging_agent.environment.state = (
                 self.charging_agent.environment.get_state(self, self.env)
             )
             self.charging_agent.environment.env = self.env
             self.charging_agent.reset_game()
-        self.pricing_agent = pricing_agent
-        if pricing_agent:
+        
+        # Setup pricing agent
+        if self.pricing_agent:
             self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
                 self, self.env
             )
             self.pricing_agent.environment.env = self.env
             self.pricing_agent.reset_game()
-
-        if storage_agent:
-            self.storage_agent = storage_agent
+        
+        # Setup storage agent
+        if self.storage_agent:
             self.storage_agent.environment.state = (
                 self.storage_agent.environment.get_state(self, self.env)
             )
             self.storage_agent.environment.env = self.env
             self.storage_agent.reset_game()
-
+        
+        # Link agents to operator
         self.operator.charging_agent = charging_agent
         self.operator.storage_agent = storage_agent
         self.operator.pricing_agent = pricing_agent
 
-        self.peak_threshold = Configuration.instance().peak_threshold
-
-    ##############################################################
+    # ============================================================================
     # SETUP ENVIRONMENT
+    # ============================================================================
 
-    def EVCC_sim_setup(self, request_data):
-
-        # infrastaructur
+    def EVCC_sim_setup(self, request_data: pd.DataFrame) -> List[Any]:
+        """
+        Setup the EVCC simulation environment.
+        
+        Args:
+            request_data: DataFrame containing charging request data
+            
+        Returns:
+            List of vehicle request objects
+        """
+        # Initialize infrastructure
         self.initialize_infrastructure()
 
         # TODO: This is just a hack to deal with requests with the same arrival period
@@ -258,102 +561,101 @@ class EVCC_Sim_Model:
         # request_data = request_data.drop_duplicates(subset=['EntryMinutesFromSimStart'])
         # request_data = request_data.reset_index(drop=True)
 
-        # requests
+        # Initialize vehicle population
         requests = self.initialize_vehicle_population(request_data)
 
         return requests
 
-    ##############################################################
-    # INITIALIZE
+    # ============================================================================
+    # INFRASTRUCTURE INITIALIZATION
+    # ============================================================================
 
-    def initialize_infrastructure(self):
+    def initialize_infrastructure(self) -> None:
         """
-        Initializing the charging, parking and grid infrastructure
+        Initialize the charging, parking and grid infrastructure.
+        
+        Creates parking lots, chargers, grid capacity, PV generation, and storage systems.
         """
-        # parking spots
+        # Initialize parking infrastructure
+        self._init_parking_infrastructure()
+        
+        # Initialize charging infrastructure
+        self._init_charging_infrastructure()
+        
+        # Initialize energy infrastructure
+        self._init_energy_infrastructure()
+
+    def _init_parking_infrastructure(self) -> None:
+        """Initialize parking infrastructure."""
         self.parking_lot = ParkingLot(env=self.env, parking_capacity=100000)
-        ParkingSpots = self.parking_lot.parking_spots
+        self.parking_spots = self.parking_lot.parking_spots
 
-        # chargers
-        Chargers = []
-        if self.chargers_type not in ["single"]:
-            id_indicator = 0
-            for i in range(self.charging_num["fast_one"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["fast"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=1,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
-            for i in range(self.charging_num["fast_two"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["fast"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=2,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
-            for i in range(self.charging_num["fast_four"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["fast"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=4,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
-            for i in range(self.charging_num["slow_one"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["slow"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=1,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
-            for i in range(self.charging_num["slow_two"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["slow"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=2,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
-            for i in range(self.charging_num["slow_four"]):
-                charger = EVCharger(
-                    env=self.env,
-                    id=id_indicator,
-                    power=self.charging_capa["slow"],
-                    period_length=self.planning_interval,
-                    number_of_connectors=4,
-                )
-                id_indicator += 1
-                Chargers.append(charger)
+    def _init_charging_infrastructure(self) -> None:
+        """Initialize charging infrastructure."""
+        self.chargers = []
+        
+        if self.chargers_type == "single":
+            self._create_single_type_chargers()
         else:
-            for i in range(self.charging_num):
-                charger = EVCharger(
-                    env=self.env,
-                    id=i,
-                    power=self.charging_capa,
-                    period_length=self.planning_interval,
-                    number_of_connectors=self.connector_num,
-                )
-                Chargers.append(charger)
+            self._create_mixed_type_chargers()
 
-        # grid capacity
-        Grid = GridCapacity(self.env, self.grid_capa)
+    def _create_single_type_chargers(self) -> None:
+        """Create chargers of a single type."""
+        for i in range(self.charging_num):
+            charger = EVCharger(
+                env=self.env,
+                id=i,
+                power=self.charging_capa,
+                period_length=self.planning_interval,
+                number_of_connectors=self.connector_num,
+            )
+            self.chargers.append(charger)
 
-        # PV capacity
-        PV = NonDispatchableGenerator(
+    def _create_mixed_type_chargers(self) -> None:
+        """Create chargers of mixed types."""
+        id_indicator = 0
+        
+        # Create fast chargers
+        self._create_charger_group("fast_one", 1, id_indicator)
+        id_indicator += self.charging_num.get("fast_one", 0)
+        
+        self._create_charger_group("fast_two", 2, id_indicator)
+        id_indicator += self.charging_num.get("fast_two", 0)
+        
+        self._create_charger_group("fast_four", 4, id_indicator)
+        id_indicator += self.charging_num.get("fast_four", 0)
+        
+        # Create slow chargers
+        self._create_charger_group("slow_one", 1, id_indicator)
+        id_indicator += self.charging_num.get("slow_one", 0)
+        
+        self._create_charger_group("slow_two", 2, id_indicator)
+        id_indicator += self.charging_num.get("slow_two", 0)
+        
+        self._create_charger_group("slow_four", 4, id_indicator)
+
+    def _create_charger_group(self, charger_type: str, connectors: int, start_id: int) -> None:
+        """Create a group of chargers with the same specifications."""
+        count = self.charging_num.get(charger_type, 0)
+        power = self.charging_capa["fast"] if "fast" in charger_type else self.charging_capa["slow"]
+        
+        for i in range(count):
+            charger = EVCharger(
+                env=self.env,
+                id=start_id + i,
+                power=power,
+                period_length=self.planning_interval,
+                number_of_connectors=connectors,
+            )
+            self.chargers.append(charger)
+
+    def _init_energy_infrastructure(self) -> None:
+        """Initialize energy infrastructure (grid, PV, storage)."""
+        # Initialize grid capacity
+        self.grid = GridCapacity(self.env, self.grid_capa)
+
+        # Initialize PV generation
+        self.non_dispatchable_generator = NonDispatchableGenerator(
             env=self.env,
             kW_peak=self.installed_capa_PV,
             base_path=self.base_path,
@@ -363,77 +665,114 @@ class EVCC_Sim_Model:
             num_lookback_periods=self.lookback,
         )
 
-        # electric storage
-        Storage = ElectricStorage(env=self.env, max_capacity_kWh=self.storage_capacity)
+        # Initialize electric storage
+        self.electric_storage = ElectricStorage(
+            env=self.env, 
+            max_capacity_kWh=self.storage_capacity
+        )
 
-        # save to objects
-        (
-            self.parking_spots,
-            self.chargers,
-            self.grid,
-            self.electric_storage,
-            self.non_dispatchable_generator,
-        ) = (ParkingSpots, Chargers, Grid, Storage, PV)
+    # ============================================================================
+    # VEHICLE POPULATION INITIALIZATION
+    # ============================================================================
 
-    def initialize_vehicle_population(self, request_data):
+    def initialize_vehicle_population(self, request_data: pd.DataFrame) -> List[Any]:
         """
-        Generate ordered list of Vehicle objects entering the EVCC on day=day
-        :param request_data: A dataframe of parking and charging requests
-        :param data: empirical preference data
-        :return: generator object containing
+        Generate ordered list of Vehicle objects entering the EVCC.
+        
+        Args:
+            request_data: DataFrame containing parking and charging requests
+            
+        Returns:
+            List of Vehicle objects representing charging requests
         """
         requests = []
+        
         for i in range(len(request_data)):
-            id = i  # int
-            facility = request_data.loc[i, "SiteID"]
-            user_type = request_data.loc[i, "ClusterName"]
-            arrival_date = request_data.loc[i, "EntryDate"]  # datetime object
-            departure_date = request_data.loc[i, "ExitDate"]  # datetime object
-            arrival_time = request_data.loc[i, "EntryDateTime"]  # datetime object
-            departure_time = request_data.loc[i, "ExitDateTime"]  # datetime object
-            arrival_period = request_data.loc[
-                i, "EntryMinutesFromSimStart"
-            ]  # minutes from start of sim
-            departure_period = request_data.loc[
-                i, "ExitMinutesFromSimStart"
-            ]  # minutes from start of sim
-            if self.benchmarking:
-                arrival_period = (
-                    int(arrival_period / 60) * 60
-                )  # Activate it only when we use perfect info
-                departure_period = (
-                    int(min(departure_period, self.sim_time) / 60) * 60
-                )  # Activate it only when we use perfect info
-                # departure_period = arrival_period + 4
-            ev = request_data.loc[i, "EV_yn"]  # EV yes or no
-            energy_requested = (
-                request_data.loc[i, "final_kWhRequested_updated"] * 2
-            )  # kwh
-            energy_charged = 0  # initialize to 0
-            battery_size = request_data.loc[i, "BatterySize"]  # kwh
-
-            vehicle_i = Vehicle(
-                self.env,
-                id=id,
-                user_type=user_type,
-                facility=facility,
-                arrival_date=arrival_date,
-                departure_date=departure_date,
-                arrival_time=arrival_time,
-                departure_time=departure_time,
-                arrival_period=arrival_period,
-                departure_period=departure_period,
-                sim_time=self.sim_time,
-                ev=ev,
-                energy_requested_input=energy_requested,
-                energy_charged=energy_charged,
-                battery_size=battery_size,
-            )
-
-            requests.append(vehicle_i)
-        # if self.planning is True:
-        requests = [i for i in requests if i.ev == 1]
+            vehicle = self._create_vehicle_from_request(request_data, i)
+            requests.append(vehicle)
+            
         return requests
+
+    def _create_vehicle_from_request(self, request_data: pd.DataFrame, index: int) -> Any:
+        """
+        Create a vehicle object from request data.
+        
+        Args:
+            request_data: DataFrame containing request data
+            index: Index of the request in the DataFrame
+            
+        Returns:
+            Vehicle object
+        """
+        # Extract basic request information
+        request_info = self._extract_request_info(request_data, index)
+        
+        # Create vehicle object
+        vehicle = Vehicle(
+            env=self.env,
+            id=request_info["id"],
+            facility=request_info["facility"],
+            user_type=request_info["user_type"],
+            arrival_date=request_info["arrival_date"],
+            departure_date=request_info["departure_date"],
+            arrival_time=request_info["arrival_time"],
+            departure_time=request_info["departure_time"],
+            arrival_period=request_info["arrival_period"],
+            departure_period=request_info["departure_period"],
+            ev=request_info["ev"],
+            energy_requested_input=request_info["energy_requested"],
+            sim_time=self.sim_time,
+            energy_charged=0,  # Initialize to 0
+            battery_size=request_data.loc[index, "BatterySize"]
+        )
+        
+        return vehicle
+
+    def _extract_request_info(self, request_data: pd.DataFrame, index: int) -> Dict[str, Any]:
+        """
+        Extract request information from DataFrame.
+        
+        Args:
+            request_data: DataFrame containing request data
+            index: Index of the request
+            
+        Returns:
+            Dictionary containing extracted request information
+        """
+        return {
+            "id": index,
+            "facility": request_data.loc[index, "SiteID"],
+            "user_type": request_data.loc[index, "ClusterName"],
+            "arrival_date": request_data.loc[index, "EntryDate"],
+            "departure_date": request_data.loc[index, "ExitDate"],
+            "arrival_time": request_data.loc[index, "EntryDateTime"],
+            "departure_time": request_data.loc[index, "ExitDateTime"],
+            "arrival_period": request_data.loc[index, "EntryMinutesFromSimStart"],
+            "departure_period": request_data.loc[index, "ExitMinutesFromSimStart"],
+            "ev": self._determine_ev_status(request_data, index),
+            "energy_requested": self._get_energy_requested(request_data, index),
+            "park_duration": self._calculate_park_duration(request_data, index),
+            "assigned_charger": None  # Will be assigned during routing
+        }
+
+    def _determine_ev_status(self, request_data: pd.DataFrame, index: int) -> bool:
+        """Determine if the request is for an electric vehicle."""
+        return bool(request_data.loc[index, "EV_yn"])
+
+    def _get_energy_requested(self, request_data: pd.DataFrame, index: int) -> float:
+        """Get the energy requested for the vehicle."""
+        return request_data.loc[index, "final_kWhRequested_updated"] * 2
+
+    def _calculate_park_duration(self, request_data: pd.DataFrame, index: int) -> int:
+        """Calculate the parking duration for the vehicle."""
+        arrival_period = request_data.loc[index, "EntryMinutesFromSimStart"]
+        departure_period = request_data.loc[index, "ExitMinutesFromSimStart"]
+        
+        if self.benchmarking:
+            arrival_period = int(arrival_period / 60) * 60
+            departure_period = int(min(departure_period, self.sim_time) / 60) * 60
+            
+        return departure_period - arrival_period
 
     ##############################################################
     # RUN SIMULATION

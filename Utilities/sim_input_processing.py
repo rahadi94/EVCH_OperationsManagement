@@ -136,7 +136,7 @@ def get_sim_charging_requests(
     day_types=["Workday", "Saturday", "Sunday"],
     limit_requests_to_capa=False,
     data_source = 'ACN',
-    random_demand = True
+    random_demand = False
 ):
     """
     Combined processing and sampling routine
