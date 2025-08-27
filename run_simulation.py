@@ -10,10 +10,10 @@ from resources.configuration.configuration import Configuration
 from resources.logging.extra_default_filter import ExtraDefaultFilter
 from resources.logging.simulation_context_filter import SimulationContextFilter
 from resources.logging.log import lg
-from Simulation.model import EVCC_Sim_Model
-from Utilities.sim_input_processing import sample_week
+from simulation.model import EVCC_Sim_Model
+from utilities.sim_input_processing import sample_week
 
-from Utilities.sim_input_processing import sample_training_and_test_weeks, sample_week
+from utilities.sim_input_processing import sample_training_and_test_weeks, sample_week
 
 
 
@@ -128,7 +128,7 @@ def run_single_simulation(
     start_day=SIM_START_DAY,
 ):
     env = simpy.Environment()  # Creating the simpy environment
-    # Inject Simulation Environment to Logger (such that we can log the env time)
+    # Inject simulation Environment to Logger (such that we can log the env time)
     cf = SimulationContextFilter(filter_name='add_env', extra=env)
     edf = ExtraDefaultFilter(filter_name="add_default_value")
     lg.addFilter(cf)

@@ -11,6 +11,7 @@ __pycache__/
 
 # Data files
 *.csv
+*.xlsx
 *.pkl
 *.pstat
 *.pdf
@@ -35,3 +36,10 @@ investment_results_Facility_KoeBogen_2019-06-03.csv
 !/Cache/pv_loads.pkl
 data/input/ACN_Caltech_Charging_Data/.Rapp.history
 data/input/Parking_Data/Bucerius Passage Hamburg 2020.xlsx
+data/input/Building_Load_Profile_Data/Königsalle 2 (Beide Lastgänge)_2018.xlsx
+data/input/ACN_Caltech_Charging_Data/acndata_sessions_Caltech.json
+data/input/ACN_Caltech_Charging_Data/acndata_sessions_office1.json
+data/input/Building_Load_Profile_Data/Lastgang_Strom_Objekt H1.xls
+data/output/actor_pricing_double_capa_500_2_average_power_m_200_m_post_tuning
+data/input/ACN_Caltech_Charging_Data/acndata_sessions_JPL.json
+data/output/actor_pricing_double_capa_500_2_average_power_m_200_m_post_tuning

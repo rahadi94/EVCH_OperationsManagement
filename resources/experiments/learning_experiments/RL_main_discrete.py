@@ -1,7 +1,47 @@
-from datetime import datetime
+import gym
 
+from datetime import datetime
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.A2C import (
+    A2C,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.A3C import (
+    A3C,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.SAC import (
+    SAC,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DDQN import (
+    DDQN,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DDQN_With_Prioritised_Experience_Replay import (
+    DDQN_With_Prioritised_Experience_Replay,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DQN_With_Fixed_Q_Targets import (
+    DQN_With_Fixed_Q_Targets,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.DDPG import (
+    DDPG,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.policy_gradient_agents.PPO import (
+    PPO,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.environments.Four_Rooms_Environment import (
+    Four_Rooms_Environment,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.hierarchical_agents.SNN_HRL import (
+    SNN_HRL,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.actor_critic_agents.TD3 import (
+    TD3,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.Trainer import (
+    Trainer,
+)
 from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.utilities.data_structures.Config import (
     Config,
+)
+from Deep_Reinforcement_Learning_Algorithms_with_PyTorch_master.agents.DQN_agents.DQN import (
+    DQN,
 )
 
 # random.seed(1)
@@ -12,7 +52,7 @@ from utilities.rl_environments.rl_environment import ChargingHubInvestmentEnv
 
 config = Config()
 config.seed = 1
-config.num_episodes_to_run = 300
+config.num_episodes_to_run = 1500
 config.file_to_save_data_results = "result/result"
 config.file_to_save_results_graph = "result/plot"
 config.visualise_individual_results = True
@@ -22,31 +62,32 @@ config.runs_per_agent = 1
 config.use_GPU = False
 config.evaluation = False
 config.learnt_network = False
-config.average_score_required_to_win = -5000
-config.environment = ChargingHubInvestmentEnv(config=config, DQN=True)
+config.average_score_required_to_win = -0
+config.environment = ChargingHubInvestmentEnv(config=config, DQN=False)
 config.start_time = datetime.now()
 config.time = None
-config.path = "[32,32]_0.5_DQN"
+# config.path = '[64,64]_0.5_16_0.005_DDQN_3action_100nstep_100updates_0.9tau_noRS_noSC_TR6_F1'
+config.path = "KoeBogen_new"
 config.hyperparameters = {
     "DQN_Agents": {
         "learning_rate": 0.005,
-        "batch_size": 32,
+        "batch_size": 64,
         "buffer_size": 40000,
-        "epsilon": 0.5,
+        "epsilon": 0.3,
         "epsilon_decay_rate_denominator": 50,
         "discount_rate": 0.99,
-        "tau": 0.1,
+        "tau": 0.9,
         "alpha_prioritised_replay": 0.6,
         "beta_prioritised_replay": 0.4,
         "incremental_td_error": 1e-8,
-        "update_every_n_steps": 3,
-        "linear_hidden_units": [64, 256],
+        "update_every_n_steps": 10,
+        "linear_hidden_units": [64, 64],
         "final_layer_activation": "None",
         "batch_norm": False,
-        "gradient_clipping_norm": 5,
+        "gradient_clipping_norm": None,
         "HER_sample_proportion": 0.8,
         "clip_rewards": False,
-        "learning_iterations": 1,
+        "learning_iterations": 100,
     },
     "Stochastic_Policy_Search_Agents": {
         "policy_network_type": "Linear",
@@ -65,6 +106,7 @@ config.hyperparameters = {
         "linear_hidden_units": [20],
         "final_layer_activation": "SOFTMAX",
         "learning_iterations_per_round": 7,
+        "epsilon": 0.3,
         "discount_rate": 0.99,
         "batch_norm": False,
         "clip_epsilon": 0.1,
@@ -78,8 +120,8 @@ config.hyperparameters = {
         "clip_rewards": False,
     },
     "Actor_Critic_Agents": {
-        "learning_rate": 0.001,
-        "linear_hidden_units": [16],
+        "learning_rate": 0.01,
+        "linear_hidden_units": [64],
         "final_layer_activation": ["SOFTMAX", None],
         "gradient_clipping_norm": 25.0,
         "discount_rate": 0.99,
@@ -87,34 +129,34 @@ config.hyperparameters = {
         "normalise_rewards": False,
         "automatically_tune_entropy_hyperparameter": True,
         "add_extra_noise": False,
-        "min_steps_before_learning": 64,
-        "do_evaluation_iterations": True,
+        "min_steps_before_learning": 16,
+        "do_evaluation_iterations": False,
         "clip_rewards": False,
         "Actor": {
-            "learning_rate": 0.005,
-            "linear_hidden_units": [16],
+            "learning_rate": 0.0001,
+            "linear_hidden_units": [32, 32],
             "final_layer_activation": "TANH",
             "batch_norm": False,
-            "tau": 0.005,
-            "gradient_clipping_norm": 5,
+            "tau": 0.05,
+            "gradient_clipping_norm": 25,
         },
         "Critic": {
-            "learning_rate": 0.005,
+            "learning_rate": 0.0001,
             "linear_hidden_units": [64, 64],
             "final_layer_activation": "None",
             "batch_norm": False,
             "buffer_size": 100000,
-            "tau": 0.005,
-            "gradient_clipping_norm": 5,
+            "tau": 0.05,
+            "gradient_clipping_norm": 25,
         },
-        "batch_size": 8,
+        "batch_size": 16,
         "mu": 0.0,  # for O-H noise
-        "theta": 0.15,  # for O-H noise
+        "theta": 0.25,  # for O-H noise
         "sigma": 0.25,  # for O-H noise
-        "action_noise_std": 0.2,  # for TD3
+        "action_noise_std": 0.5,  # for TD3
         "action_noise_clipping_range": 0.5,  # for TD3
-        "update_every_n_steps": 5,
-        "learning_updates_per_learning_session": 5,
+        "update_every_n_steps": 1000,
+        "learning_updates_per_learning_session": 10,
         "HER_sample_proportion": 0.8,
         "exploration_worker_difference": 1.0,
     },
@@ -160,3 +202,57 @@ config.hyperparameters = {
         },
     },
 }
+
+
+def test_agent_solve_bit_flipping_game():
+    AGENTS = [
+        TD3
+    ]  # , DQN_With_Fixed_Q_Targets, DDQN_With_Prioritised_Experience_Replay, DQN]
+    trainer = Trainer(config, AGENTS)
+    results = trainer.run_games_for_agents()
+    # for agent in AGENTS:
+    #     agent_results = results[agent.agent_name]
+    #     # agent_results = np.max(agent_results[0][1][50:])
+    #     assert agent_results >= 0.0, "Failed for {} -- score {}".format(agent.agent_name, agent_results)
+
+
+def test_agents_can_play_games_of_different_dimensions():
+    config.num_episodes_to_run = 10
+    config.hyperparameters["DQN_Agents"]["batch_size"] = 3
+    AGENTS = [
+        A2C,
+        A3C,
+        PPO,
+        DDQN,
+        DQN_With_Fixed_Q_Targets,
+        DDQN_With_Prioritised_Experience_Replay,
+        DQN,
+    ]
+    trainer = Trainer(config, AGENTS)
+    config.environment = gym.make("CartPole-v0")
+    results = trainer.run_games_for_agents()
+    for agent in AGENTS:
+        assert agent.agent_name in results.keys()
+
+    AGENTS = [SAC, TD3, PPO, DDPG]
+    config.environment = gym.make("MountainCarContinuous-v0")
+    trainer = Trainer(config, AGENTS)
+    results = trainer.run_games_for_agents()
+    for agent in AGENTS:
+        assert agent.agent_name in results.keys()
+
+    AGENTS = [DDQN, SNN_HRL]
+    config.environment = Four_Rooms_Environment(
+        15,
+        15,
+        stochastic_actions_probability=0.25,
+        random_start_user_place=True,
+        random_goal_place=False,
+    )
+    trainer = Trainer(config, AGENTS)
+    results = trainer.run_games_for_agents()
+    for agent in AGENTS:
+        assert agent.agent_name in results.keys()
+
+
+test_agent_solve_bit_flipping_game()

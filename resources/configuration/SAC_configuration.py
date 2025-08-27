@@ -1,6 +1,6 @@
 import argparse
 
-from Utilities.RL_Agents.utilities.data_structures.Config import (
+from utilities.rl_agents.utilities.data_structures.Config import (
     Config,
 )
 from resources.configuration.configuration import Configuration
@@ -130,7 +130,7 @@ pricing_config.hyperparameters = {
         "learning_iterations": 1,
     },
     "Actor_Critic_Agents": {
-        "learning_rate": 0.0003,
+        "learning_rate": 0.001,
         "linear_hidden_units": [64],
         "final_layer_activation": ["SOFTMAX", None],
         "gradient_clipping_norm": None,
@@ -144,7 +144,7 @@ pricing_config.hyperparameters = {
         "do_evaluation_iterations": pricing_config.evaluation,
         "clip_rewards": False,
         "Actor": {
-            "learning_rate": 0.000001,
+            "learning_rate": 0.001,
             "linear_hidden_units": [512, 256, 512],
             "final_layer_activation": "TANH",
             "batch_norm": False,
@@ -152,7 +152,7 @@ pricing_config.hyperparameters = {
             "gradient_clipping_norm": None,
         },
         "Critic": {
-            "learning_rate": 0.000001,
+            "learning_rate": 0.001,
             "linear_hidden_units": [512, 256, 512],
             "final_layer_activation": "None",
             "batch_norm": False,
@@ -160,7 +160,7 @@ pricing_config.hyperparameters = {
             "tau": 0.05,
             "gradient_clipping_norm": None,
         },
-        "batch_size": 64,
+        "batch_size": 256,
         "mu": 0.0,  # for O-H noise
         "theta": 0.15,  # for O-H noise
         "sigma": 0.15,  # for O-H noise
