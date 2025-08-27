@@ -42,7 +42,7 @@ class Configuration:
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = False
-        self.evaluation_after_training = False
+        self.evaluation_after_training = True
         self.demand_threshold = 0
         self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
@@ -68,7 +68,7 @@ class Configuration:
         prices = [1, 0.2]
         power = [11, 50]
         parking_price = 0
-        price_parameters = [1.5, 0]
+        price_parameters = [1, 0.2]
         self.max_price_ToU = 1.5
         self.degree_of_power_in_price_function = 1  # Don't change this :D
         # self.pricing_agent_name = 'pricing_single_22'

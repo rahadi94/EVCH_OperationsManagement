@@ -56,7 +56,7 @@ def run_experiments():
     pricing_agent = SAC(pricing_config)
     training_results = pd.DataFrame([])
     episode = 1
-    NUMBER_EPISODES = 301
+    NUMBER_EPISODES = 21
     if Configuration.instance().pricing_mode == "perfect_info":
         NUMBER_EPISODES = 1
     output = []
@@ -182,7 +182,7 @@ def find_best_parameters():
                     [pd.DataFrame([[lr, bs, tau, mean_reward]], columns=training_results.columns),
                      training_results], ignore_index=True)
                 print(f'{hyperparameters}, {results_dict}, best: {best_results}, best_parameters: {best_parameters}')
-                training_results.to_csv(f'{Configuration.instance().OUTPUT_DATA_PATH}training_results_{pricing_config.name}_tuning.csv', index=False)
+                training_results.to_csv(f'utilities/raw_output/training_results_{pricing_config.name}_tuning.csv', index=False)
 
 # find_best_parameters()
 run_experiments()
