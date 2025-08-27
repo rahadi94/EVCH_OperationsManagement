@@ -7,139 +7,314 @@ import Simulation.Operations.StorageAlgorithms as store_algos
 from resources.logging.log import lg
 import numpy as np
 import pandas as pd
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
 
 from Simulation.Operations.NonLinearAlgorithms import nonlinear_pricing
-from Simulation.Operations.Operator_utils import get_exp_free_grid_capacity_utility
+from Simulation.Operations.Operator_utils import compute_free_grid_capacity
 from Utilities.RL_environments.rl_pricing_env import convert_to_vector
 
 
-class Operator:  # we also need a class for normal vehicles!!!
+@dataclass
+class GridCapacityData:
+    """Data class for grid capacity information."""
+    free_grid_capa_actual: List[float]
+    free_grid_capa_predicted: List[float]
+    free_grid_capa_without_storage: float
+    base_load_list: List[float]
+    generation_list: List[float]
+
+
+@dataclass
+class PricingData:
+    """Data class for pricing information."""
+    energy_price: float
+    parking_price: float
+    pricing_mode: str
+    price_history: pd.DataFrame
+
+
+@dataclass
+class ChargingRequest:
+    """Data class for charging request information."""
+    request_id: str
+    energy_requested: float
+    park_duration: int
+    ev: bool
+    mode: Optional[str]
+    charging_power: float
+    assigned_charger: Optional[Any]
+
+
+class Operator:
+    """
+    Main operator class for managing EV charging operations.
+    
+    Handles routing, charging, storage, and pricing decisions for electric vehicle
+    charging infrastructure.
+    """
 
     def __init__(
         self,
-        env,
-        requests,
-        chargers,
-        routing_strategy,
-        charging_strategy,
-        storage_strategy,
-        charging_capa,
-        grid_capa,
-        sim_time,
-        electricity_tariff,
-        connector_num,
-        parking_spots,
-        baseload,
-        max_facility_baseload,
-        non_dispatchable_generator,
-        electric_storage,
-        num_lookback_periods,
-        planning_interval,
-        optimization_period_length,
-        num_lookahead_planning_periods,
-        service_level,
-        charging_hub,
-        minimum_served_demand,
+        env: simpy.Environment,
+        requests: List[Any],
+        chargers: List[Any],
+        routing_strategy: str,
+        charging_strategy: str,
+        storage_strategy: str,
+        charging_capa: float,
+        grid_capa: float,
+        sim_time: int,
+        electricity_tariff: float,
+        connector_num: int,
+        parking_spots: int,
+        baseload: Any,
+        max_facility_baseload: float,
+        non_dispatchable_generator: Any,
+        electric_storage: Any,
+        num_lookback_periods: int,
+        planning_interval: int,
+        optimization_period_length: int,
+        num_lookahead_planning_periods: int,
+        service_level: float,
+        charging_hub: Any,
+        minimum_served_demand: float,
     ):
+        """
+        Initialize the Operator with simulation parameters and strategies.
+        
+        Args:
+            env: SimPy environment for discrete event simulation
+            requests: List of charging requests
+            chargers: List of charging stations
+            routing_strategy: Strategy for routing vehicles to chargers
+            charging_strategy: Strategy for charging optimization
+            storage_strategy: Strategy for energy storage management
+            charging_capa: Charging capacity limit
+            grid_capa: Grid capacity limit
+            sim_time: Total simulation time
+            electricity_tariff: Electricity price
+            connector_num: Number of connectors
+            parking_spots: Number of parking spots
+            baseload: Base load data
+            max_facility_baseload: Maximum facility base load
+            non_dispatchable_generator: Renewable energy generator
+            electric_storage: Energy storage system
+            num_lookback_periods: Number of historical periods for prediction
+            planning_interval: Planning interval duration
+            optimization_period_length: Length of optimization period
+            num_lookahead_planning_periods: Number of future periods to plan
+            service_level: Target service level
+            charging_hub: Charging hub object
+            minimum_served_demand: Minimum demand to serve
+        """
+        self._init_simulation_environment(env, sim_time)
+        self._init_planning_parameters(
+            num_lookback_periods, 
+            planning_interval, 
+            optimization_period_length, 
+            num_lookahead_planning_periods
+        )
+        self._init_strategies(routing_strategy, charging_strategy, storage_strategy)
+        self._init_infrastructure(
+            requests, chargers, charging_capa, grid_capa, 
+            connector_num, parking_spots, charging_hub
+        )
+        self._init_energy_systems(
+            baseload, max_facility_baseload, 
+            non_dispatchable_generator, electric_storage
+        )
+        self._init_pricing_configuration(
+            electricity_tariff, service_level, minimum_served_demand
+        )
+        self._init_agents_and_events()
+        self._init_capacity_tracking()
+        
+        # Initialize based on configuration
+        self._initialize_strategy_dependent_behavior()
 
-        self.env = env  # simulation environment
+    def _init_simulation_environment(self, env: simpy.Environment, sim_time: int) -> None:
+        """Initialize simulation environment and timing parameters."""
+        if env is None:
+            raise ValueError("SimPy environment cannot be None")
+        if sim_time <= 0:
+            raise ValueError("Simulation time must be positive")
+            
+        self.env = env
         self.sim_time = sim_time
-        self.num_lookback_periods = num_lookback_periods  # how many pr sim periods to retrieve (history for prediction models)
+
+    def _init_planning_parameters(
+        self, 
+        num_lookback_periods: int,
+        planning_interval: int,
+        optimization_period_length: int,
+        num_lookahead_planning_periods: int
+    ) -> None:
+        """Initialize planning and optimization parameters."""
+        # Validate parameters
+        if num_lookback_periods < 0:
+            raise ValueError("Number of lookback periods cannot be negative")
+        if planning_interval <= 0:
+            raise ValueError("Planning interval must be positive")
+        if optimization_period_length <= 0:
+            raise ValueError("Optimization period length must be positive")
+        if num_lookahead_planning_periods <= 0:
+            raise ValueError("Number of lookahead planning periods must be positive")
+            
+        self.num_lookback_periods = num_lookback_periods
         self.planning_interval = planning_interval
         self.optimization_period_length = optimization_period_length
-        self.num_lookahead_planning_periods = num_lookahead_planning_periods  # how many planning periods do we look ahead?
-        self.demand_threshold = Configuration.instance().demand_threshold  # min demand for serving request in kWh
-        self.duration_threshold = (
-            Configuration.instance().duration_threshold  # min duration for serving request in sim periods (i.e., seconds)
-        )
+        self.num_lookahead_planning_periods = num_lookahead_planning_periods
+        
+        # Load configuration thresholds
+        config = Configuration.instance()
+        self.demand_threshold = config.demand_threshold
+        self.duration_threshold = config.duration_threshold
+
+    def _init_strategies(
+        self, 
+        routing_strategy: str, 
+        charging_strategy: str, 
+        storage_strategy: str
+    ) -> None:
+        """Initialize operational strategies."""
         self.routing_strategy = routing_strategy
         self.charging_strategy = charging_strategy
         self.storage_strategy = storage_strategy
+
+    def _init_infrastructure(
+        self,
+        requests: List[Any],
+        chargers: List[Any],
+        charging_capa: float,
+        grid_capa: float,
+        connector_num: int,
+        parking_spots: int,
+        charging_hub: Any
+    ) -> None:
+        """Initialize charging infrastructure components."""
         self.requests = requests
         self.chargers = chargers
         self.charging_capa = charging_capa
         self.grid_capa = grid_capa
-        self.baseload = baseload
-        self.non_dispatchable_generator = (
-            non_dispatchable_generator  # this is an object
-        )
-        self.electric_storage = electric_storage  # this is an object
-        self.free_grid_capa_actual = (
-            0  # self.update_expected_free_grid_capacity()#0 #initialize as 0
-        )
-        self.free_grid_capa_predicted = (
-            0  # self.update_expected_free_grid_capacity()#0 #initialize as 0
-        )
-        self.free_battery_load_capa = 0
-        self.free_grid_capa_without_storage = 0
-        self.peak_load_history = list(
-            [int(max_facility_baseload)]
-        )  # collects peak load over sim horizon (necessary to compute l_star), initialize with base facility peak load
-        self.peak_load_history_inc_storage = list([int(max_facility_baseload)])
-        self.electricity_tariff = electricity_tariff
         self.connector_num = connector_num
         self.parking_spots = parking_spots
-        self.service_level = service_level
-        self.arrival_event = env.event()
-        self.routing_decision_event = env.event()
         self.charging_hub = charging_hub
         self.storage_object = charging_hub.electric_storage
+
+    def _init_energy_systems(
+        self,
+        baseload: Any,
+        max_facility_baseload: float,
+        non_dispatchable_generator: Any,
+        electric_storage: Any
+    ) -> None:
+        """Initialize energy systems and load tracking."""
+        self.baseload = baseload
+        self.non_dispatchable_generator = non_dispatchable_generator
+        self.electric_storage = electric_storage
+        
+        # Initialize peak load history
+        self.peak_load_history = [int(max_facility_baseload)]
+        self.peak_load_history_inc_storage = [int(max_facility_baseload)]
+
+    def _init_pricing_configuration(
+        self,
+        electricity_tariff: float,
+        service_level: float,
+        minimum_served_demand: float
+    ) -> None:
+        """Initialize pricing and service configuration."""
+        self.electricity_tariff = electricity_tariff
+        self.service_level = service_level
+        self.minimum_served_demand = minimum_served_demand
+        
+        # Load pricing configuration
+        config = Configuration.instance()
+        self.peak_threshold = config.peak_threshold
+        self.peak_cost = config.peak_cost
+        self.B2G = config.B2G
+        self.price_pairs = config.energy_prices
+        self.multiple_power = config.multiple_power
+        self.parking_fee = config.parking_price
+        self.pricing_parameters = config.price_parameters
+        self.pricing_mode = config.pricing_mode
+        
+        # Initialize pricing state
+        self.price_history = pd.DataFrame()
+        self.energy_reward = 0
+        self.objective = 0
+        self.generation_min = 0
+
+    def _init_agents_and_events(self) -> None:
+        """Initialize agents and simulation events."""
         self.charging_agent = None
         self.storage_agent = None
         self.pricing_agent = None
-        self.minimum_served_demand = minimum_served_demand
-        self.agent_name = "PGMM"  # PGM or n_step
-        self.generation_min = 0
-        self.peak_threshold = Configuration.instance().peak_threshold
-        self.peak_cost = Configuration.instance().peak_cost
-        self.energy_reward = 0
-        self.objective = 0
-        self.B2G = Configuration.instance().B2G
-        self.price_pairs = (
-            Configuration.instance().energy_prices
-        )  # [minimum_average_power, price]
-        self.price_history = pd.DataFrame()
-        self.multiple_power = Configuration.instance().multiple_power
-        self.parking_fee = Configuration.instance().parking_price
-        self.pricing_parameters = Configuration.instance().price_parameters
-        self.pricing_mode = Configuration.instance().pricing_mode
+        self.agent_name = "PGMM"
+        
+        # Initialize simulation events
+        self.arrival_event = self.env.event()
+        self.routing_decision_event = self.env.event()
         self.organizer = simpy.Resource(self.env, capacity=1)
+
+    def _init_capacity_tracking(self) -> None:
+        """Initialize capacity tracking variables."""
+        self.free_grid_capa_actual = 0
+        self.free_grid_capa_predicted = 0
+        self.free_battery_load_capa = 0
+        self.free_grid_capa_without_storage = 0
+
+    def _initialize_strategy_dependent_behavior(self) -> None:
+        """Initialize behavior based on selected strategies."""
         if self.pricing_mode == "perfect_info":
             self.solve_pricing_with_perfect_info()
+        
         if self.charging_strategy == "average_power":
-            for i in requests:
-                i.charging_power = i.energy_requested / (i.park_duration) * 60
+            self._set_average_power_charging()
+
+    def _set_average_power_charging(self) -> None:
+        """Set average power charging for all requests."""
+        for request in self.requests:
+            request.charging_power = request.energy_requested / request.park_duration * 60
 
     ##########################################
     # BELOW FUNCTIONS DERIVE DECISIONS
 
     # have this update automatically each planning_period
-    def get_exp_free_grid_capacity(self):
+    def get_exp_free_grid_capacity(self) -> GridCapacityData:
         """
-        Updates free grid capacity based on expected base load and non-dispatchable generation
-        :param planning_period_length: length and planning window in sim periods
-        :param num_lookahead_periods: number of planning periods for which plan is created
-        :return:
+        Compute and update expected free grid capacity and related time series.
+
+        Returns:
+            GridCapacityData: Structured data containing all grid capacity information
+            
+        Notes:
+        - Reads simulation context (time, planning window) and calls the shared utility.
+        - Sets instance attributes used by scheduling and pricing routines.
+        - Returns structured data for better type safety.
         """
-        results = get_exp_free_grid_capacity_utility(
-            current_time=self.env.now,
-            sim_time=self.sim_time,
-            planning_interval=self.planning_interval,
-            num_lookahead_planning_periods=self.num_lookahead_planning_periods,
-            num_lookback_periods=self.num_lookback_periods,
-            baseload=self.baseload,
-            non_dispatchable_generator=self.non_dispatchable_generator,
-            electric_storage=self.electric_storage,
-            charging_strategy=self.charging_strategy,
-            charging_hub=self.charging_hub,
-            grid_capa=self.grid_capa,
+        results = compute_free_grid_capacity(self)
+
+        # Create structured data object
+        grid_data = GridCapacityData(
+            free_grid_capa_actual=results.get("free_grid_capa_actual", []),
+            free_grid_capa_predicted=results.get("free_grid_capa_predicted", []),
+            free_grid_capa_without_storage=results.get("free_grid_capa_without_storage", 0.0),
+            base_load_list=results.get("base_load_list", []),
+            generation_list=results.get("generation_list", [])
         )
 
-        self.free_grid_capa_actual = results["free_grid_capa_actual"]
-        self.base_load_list = results["base_load_list"]
-        self.generation_list = results["generation_list"]
-        self.free_grid_capa_without_storage = results["free_grid_capa_without_storage"]
-        self.free_grid_capa_predicted = results["free_grid_capa_predicted"]
+        # Update instance attributes for backward compatibility
+        self.free_grid_capa_actual = grid_data.free_grid_capa_actual
+        self.base_load_list = grid_data.base_load_list
+        self.generation_list = grid_data.generation_list
+        self.free_grid_capa_without_storage = grid_data.free_grid_capa_without_storage
+        self.free_grid_capa_predicted = grid_data.free_grid_capa_predicted
+
+        return grid_data
+
+
 
     def get_available_battery_load(self):
         """
@@ -160,208 +335,462 @@ class Operator:  # we also need a class for normal vehicles!!!
 
         self.free_battery_load_capa = battery_max
 
-    # routing
-    def get_routing_instructions(self, request):
+    # ============================================================================
+    # ROUTING METHODS
+    # ============================================================================
+
+    def get_routing_instructions(self, request: Any) -> Any:
         """
-        Routes new arrivals to charging stations. This is on a discrete event basis, i.e. per each arrival (as opposed to the ca)
-        :param routing_strategy:
-        :return:
+        Route new arrivals to charging stations.
+        
+        This is called on a discrete event basis (per arrival) as opposed to 
+        continuous optimization approaches.
+        
+        Args:
+            request: Charging request to route
+            
+        Returns:
+            Assigned charger for the request
         """
-        strategy_functions = {
-            "random": route_algos.random_charger_assignment,
-            "lowest_occupancy_first": route_algos.lowest_occupancy_first_charger_assignment,
-            "fill_one_after_other": route_algos.fill_one_after_other_charger_assignment,
-            "lowest_utilization_first": route_algos.lowest_utilization_first_charger_assignment,
-            "matching_supply_demand": route_algos.matching_supply_demand_level,
-            "minimum_power_requirement": route_algos.assign_to_the_minimum_power
+        return self._route_request_by_strategy(request)
+
+    def _route_request_by_strategy(self, request: Any) -> Any:
+        """Route request using the configured routing strategy."""
+        if self.routing_strategy in self._ROUTING_STRATEGIES:
+            return self._ROUTING_STRATEGIES[self.routing_strategy](request)
+        
+        # Fallback for perfect info strategies
+        if self.routing_strategy in ["perfect_info", "perfect_info_with_storage"]:
+            return request.assigned_charger
+            
+        raise ValueError(f"Unknown routing strategy: {self.routing_strategy}")
+
+    @property
+    def _ROUTING_STRATEGIES(self) -> Dict[str, callable]:
+        """Get routing strategy functions."""
+        return {
+            "random": self._route_random,
+            "lowest_occupancy_first": self._route_lowest_occupancy_first,
+            "fill_one_after_other": self._route_fill_one_after_other,
+            "lowest_utilization_first": self._route_lowest_utilization_first,
+            "matching_supply_demand": self._route_matching_supply_demand,
+            "minimum_power_requirement": self._route_minimum_power_requirement,
         }
 
-        if self.routing_strategy in strategy_functions:
-            charger = strategy_functions[self.routing_strategy](
-                charging_stations=self.chargers,
-                number_of_connectors=self.connector_num,
-                request=request,
-                demand_threshold=self.demand_threshold,
-                duration_threshold=self.duration_threshold,
-            )
+    def _route_random(self, request: Any) -> Any:
+        """Route using random charger assignment."""
+        return route_algos.random_charger_assignment(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
 
-        if self.routing_strategy == "perfect_info":
-            charger = request.assigned_charger
-        if self.routing_strategy == "perfect_info_with_storage":
-            charger = request.assigned_charger
-        return charger
+    def _route_lowest_occupancy_first(self, request: Any) -> Any:
+        """Route using lowest occupancy first strategy."""
+        return route_algos.lowest_occupancy_first_charger_assignment(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
 
-    # charging
-    def schedule_charging_and_routing_perfect_info(self, strategy):
+    def _route_fill_one_after_other(self, request: Any) -> Any:
+        """Route using fill one after other strategy."""
+        return route_algos.fill_one_after_other_charger_assignment(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
+
+    def _route_lowest_utilization_first(self, request: Any) -> Any:
+        """Route using lowest utilization first strategy."""
+        return route_algos.lowest_utilization_first_charger_assignment(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
+
+    def _route_matching_supply_demand(self, request: Any) -> Any:
+        """Route using matching supply demand strategy."""
+        return route_algos.matching_supply_demand_level(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
+
+    def _route_minimum_power_requirement(self, request: Any) -> Any:
+        """Route using minimum power requirement strategy."""
+        return route_algos.assign_to_the_minimum_power(
+            charging_stations=self.chargers,
+            number_of_connectors=self.connector_num,
+            request=request,
+            demand_threshold=self.demand_threshold,
+            duration_threshold=self.duration_threshold,
+        )
+
+    # ============================================================================
+    # CHARGING METHODS
+    # ============================================================================
+
+    def schedule_charging_and_routing_perfect_info(self, strategy: str) -> None:
+        """
+        Schedule charging and routing using perfect information strategies.
+        
+        Args:
+            strategy: Charging strategy to use ("perfect_info" or "perfect_info_with_storage")
+        """
         self.get_exp_free_grid_capacity()
-        connected_vehicles = [x for x in self.requests if x.mode is None and x.ev == 1]
+        connected_vehicles = self._get_connected_vehicles()
 
         if strategy == "perfect_info":
-            integrate_algos.perfect_info_charging_routing(
-                vehicles=connected_vehicles,
-                charging_stations=self.chargers,
-                env=self.env,
-                grid_capacity=self.free_grid_capa_actual,
-                electricity_cost=self.electricity_tariff,
-                baseload=self.base_load_list,
-                sim_time=self.sim_time,
-                generation=self.generation_list,
-            )
+            self._schedule_perfect_info_charging(connected_vehicles)
         elif strategy == "perfect_info_with_storage" and connected_vehicles:
-            integrate_algos.perfect_info_charging_routing_storage(
-                vehicles=connected_vehicles,
-                charging_stations=self.chargers,
-                env=self.env,
-                grid_capacity=self.free_grid_capa_actual,
-                electricity_cost=self.electricity_tariff,
-                sim_time=self.sim_time,
-                storage=self.electric_storage,
-                baseload=self.baseload_list,
-            )
+            self._schedule_perfect_info_charging_with_storage(connected_vehicles)
 
-    def apply_charging_routing_storage_perfect_info(self, charging_strategy):
-        hour = int((self.env.now % 1440) / 60) if charging_strategy == "perfect_info_with_storage" else int(
-            self.env.now / 60)
+    def _get_connected_vehicles(self) -> List[Any]:
+        """Get list of connected vehicles that are EVs and not yet assigned a mode."""
+        return [x for x in self.requests if x.mode is None and x.ev == 1]
 
+    def _schedule_perfect_info_charging(self, connected_vehicles: List[Any]) -> None:
+        """Schedule charging using perfect information without storage."""
+        integrate_algos.perfect_info_charging_routing(
+            vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            env=self.env,
+            grid_capacity=self.free_grid_capa_actual,
+            electricity_cost=self.electricity_tariff,
+            baseload=self.base_load_list,
+            sim_time=self.sim_time,
+            generation=self.generation_list,
+        )
+
+    def _schedule_perfect_info_charging_with_storage(self, connected_vehicles: List[Any]) -> None:
+        """Schedule charging using perfect information with storage integration."""
+        integrate_algos.perfect_info_charging_routing_storage(
+            vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            env=self.env,
+            grid_capacity=self.free_grid_capa_actual,
+            electricity_cost=self.electricity_tariff,
+            sim_time=self.sim_time,
+            storage=self.electric_storage,
+            baseload=self.base_load_list,
+        )
+
+    def apply_charging_routing_storage_perfect_info(self, charging_strategy: str) -> None:
+        """
+        Apply charging and storage schedules based on perfect information.
+        
+        Args:
+            charging_strategy: Strategy to use for charging and storage
+        """
+        hour = self._get_current_hour(charging_strategy)
+        self._apply_vehicle_charging_schedules(hour)
+        
+        if self._should_apply_storage_schedule(charging_strategy):
+            self._apply_storage_schedule(hour)
+
+    def _get_current_hour(self, charging_strategy: str) -> int:
+        """Get current hour based on charging strategy."""
+        if charging_strategy == "perfect_info_with_storage":
+            return int((self.env.now % 1440) / 60)
+        return int(self.env.now / 60)
+
+    def _apply_vehicle_charging_schedules(self, hour: int) -> None:
+        """Apply charging schedules to all EV requests."""
         for request in self.requests:
             if request.ev == 1:
                 request.charging_power = request.charge_schedule[hour]
 
-        if charging_strategy == "perfect_info_with_storage" and self.storage_object.max_capacity_kWh > 0:
-            storage_power = self.electric_storage.charge_schedule[hour]
-            if storage_power >= 0:
-                self.electric_storage.charge_yn = 1
-                self.electric_storage.discharge_yn = 0
-                self.electric_storage.discharging_power = 0
-                self.electric_storage.charging_power = storage_power
-            else:
-                self.electric_storage.charge_yn = 0
-                self.electric_storage.discharge_yn = 1
-                self.electric_storage.discharging_power = storage_power
-                self.electric_storage.charging_power = 0
+    def _should_apply_storage_schedule(self, charging_strategy: str) -> bool:
+        """Check if storage schedule should be applied."""
+        return (charging_strategy == "perfect_info_with_storage" and 
+                self.storage_object.max_capacity_kWh > 0)
 
-    def take_dynamic_pricing_actions(self):
+    def _apply_storage_schedule(self, hour: int) -> None:
+        """Apply storage charging/discharging schedule."""
+        storage_power = self.electric_storage.charge_schedule[hour]
+        
+        if storage_power >= 0:
+            self._set_storage_charging(storage_power)
+        else:
+            self._set_storage_discharging(storage_power)
+
+    def _set_storage_charging(self, power: float) -> None:
+        """Set storage to charging mode."""
+        self.electric_storage.charge_yn = 1
+        self.electric_storage.discharge_yn = 0
+        self.electric_storage.discharging_power = 0
+        self.electric_storage.charging_power = power
+
+    def _set_storage_discharging(self, power: float) -> None:
+        """Set storage to discharging mode."""
+        self.electric_storage.charge_yn = 0
+        self.electric_storage.discharge_yn = 1
+        self.electric_storage.discharging_power = power
+        self.electric_storage.charging_power = 0
+
+    # ============================================================================
+    # PRICING METHODS
+    # ============================================================================
+
+    def take_dynamic_pricing_actions(self) -> None:
+        """Execute dynamic pricing actions and update price history."""
         self.get_exp_free_grid_capacity()
         self.update_vehicles_status()
         self.take_pricing_action()
-        if self.pricing_mode == "Discrete":
-            self.price_history = pd.concat(
-                [
-                    self.price_history,
-                    pd.DataFrame(self.price_pairs[:, 1]).transpose(),
-                ]
-            )
-        if self.pricing_mode == "Continuous":
-            # print([self.pricing_parameters[1], self.parking_fee])
-            self.price_history = pd.concat(
-                [
-                    self.price_history,
-                    pd.DataFrame(
-                        [self.pricing_parameters[0], self.pricing_parameters[1]]
-                    ).transpose(),
-                ]
-            )
+        self._update_dynamic_price_history()
 
-    def take_static_pricing_action(self):
+    def take_static_pricing_action(self) -> None:
+        """Execute static pricing actions and update price history."""
         self.get_exp_free_grid_capacity()
         self.update_vehicles_status()
-        if self.pricing_mode == "ToU":
-            hour = int((self.env.now % 1440) / 60)
-            self.pricing_parameters[0] = (
-                    self.electricity_tariff[hour]
-                    / max(self.electricity_tariff)
-                    * Configuration.instance().max_price_ToU
-            )
-        if self.pricing_mode == "perfect_info":
-            if Configuration.instance().dynamic_fix_term_pricing:
-                self.pricing_parameters[1] = self.price_schedules[1][hour]
-                self.pricing_parameters[0] = self.price_schedules[0][hour]
-            else:
-                self.pricing_parameters[1] = self.price_schedules[hour]
+        self._update_pricing_parameters()
+        self._update_static_price_history()
+
+    def _update_dynamic_price_history(self) -> None:
+        """Update price history for dynamic pricing modes."""
         if self.pricing_mode == "Discrete":
-            self.price_history = pd.concat(
-                [
-                    self.price_history,
-                    pd.DataFrame(self.price_pairs[:, 1]).transpose(),
-                ]
-            )
-        if self.pricing_mode == "Continuous" or self.pricing_mode == "ToU":
-            self.price_history = pd.concat(
-                [
-                    self.price_history,
-                    pd.DataFrame(
-                        [self.pricing_parameters[0], self.pricing_parameters[1]]
-                    ).transpose(),
-                ]
-            )
+            self._add_discrete_price_to_history()
+        elif self.pricing_mode == "Continuous":
+            self._add_continuous_price_to_history()
 
-    def take_non_learning_charging_actions(self, charging_strategy, connected_vehicles):
-        strategy_functions = {
-            "uncontrolled": charge_algos.uncontrolled,
-            "average_power": charge_algos.average_power,
-            "first_come_first_served": charge_algos.first_come_first_served,
-            "earliest_deadline_first": charge_algos.earliest_deadline_first,
-            "least_laxity_first": charge_algos.least_laxity_first,
-            "equal_sharing": charge_algos.equal_sharing
-            }
+    def _update_static_price_history(self) -> None:
+        """Update price history for static pricing modes."""
+        if self.pricing_mode == "Discrete":
+            self._add_discrete_price_to_history()
+        elif self.pricing_mode in ["Continuous", "ToU"]:
+            self._add_continuous_price_to_history()
 
-        if charging_strategy in strategy_functions:
-            strategy_functions[charging_strategy](env=self.env,
-                    connected_vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    charging_capacity=self.charging_capa,
-                    free_grid_capacity=self.free_grid_capa_actual,
-                    planning_period_length=self.planning_interval,)
+    def _update_pricing_parameters(self) -> None:
+        """Update pricing parameters based on current mode and time."""
+        if self.pricing_mode == "ToU":
+            self._update_tou_pricing()
+        elif self.pricing_mode == "perfect_info":
+            self._update_perfect_info_pricing()
 
-        if charging_strategy == "online_myopic":
-            charge_algos.online_myopic(
+    def _update_tou_pricing(self) -> None:
+        """Update Time-of-Use pricing parameters."""
+        hour = self._get_current_hour()
+        max_price = Configuration.instance().max_price_ToU
+        self.pricing_parameters[0] = (
+            self.electricity_tariff[hour] / max(self.electricity_tariff) * max_price
+        )
+
+    def _update_perfect_info_pricing(self) -> None:
+        """Update perfect information pricing parameters."""
+        hour = self._get_current_hour()
+        config = Configuration.instance()
+        
+        if config.dynamic_fix_term_pricing:
+            self.pricing_parameters[1] = self.price_schedules[1][hour]
+            self.pricing_parameters[0] = self.price_schedules[0][hour]
+        else:
+            self.pricing_parameters[1] = self.price_schedules[hour]
+
+    def _get_current_hour(self) -> int:
+        """Get current hour of the simulation."""
+        return int((self.env.now % 1440) / 60)
+
+    def _add_discrete_price_to_history(self) -> None:
+        """Add discrete pricing data to price history."""
+        self.price_history = pd.concat([
+            self.price_history,
+            pd.DataFrame(self.price_pairs[:, 1]).transpose(),
+        ])
+
+    def _add_continuous_price_to_history(self) -> None:
+        """Add continuous pricing data to price history."""
+        self.price_history = pd.concat([
+            self.price_history,
+            pd.DataFrame([
+                self.pricing_parameters[0], 
+                self.pricing_parameters[1]
+            ]).transpose(),
+        ])
+
+    def get_current_pricing_data(self) -> PricingData:
+        """
+        Get current pricing information as structured data.
+        
+        Returns:
+            PricingData: Current pricing information
+        """
+        return PricingData(
+            energy_price=self.pricing_parameters[0] if len(self.pricing_parameters) > 0 else 0.0,
+            parking_price=self.parking_fee,
+            pricing_mode=self.pricing_mode,
+            price_history=self.price_history
+        )
+
+    # ============================================================================
+    # CHARGING ACTION METHODS
+    # ============================================================================
+
+    def take_non_learning_charging_actions(self, charging_strategy: str, connected_vehicles: List[Any]) -> None:
+        """
+        Execute non-learning charging actions based on strategy.
+        
+        Args:
+            charging_strategy: Strategy to use for charging
+            connected_vehicles: List of connected vehicles
+        """
+        self._execute_basic_charging_strategies(charging_strategy, connected_vehicles)
+        self._execute_advanced_charging_strategies(charging_strategy, connected_vehicles)
+
+    def _execute_basic_charging_strategies(self, charging_strategy: str, connected_vehicles: List[Any]) -> None:
+        """Execute basic charging strategies that don't require foresight."""
+        basic_strategies = {
+            "uncontrolled": self._execute_uncontrolled_charging,
+            "average_power": self._execute_average_power_charging,
+            "first_come_first_served": self._execute_fcfs_charging,
+            "earliest_deadline_first": self._execute_edf_charging,
+            "least_laxity_first": self._execute_llf_charging,
+            "equal_sharing": self._execute_equal_sharing_charging,
+            "online_myopic": self._execute_online_myopic_charging,
+        }
+        
+        if charging_strategy in basic_strategies:
+            basic_strategies[charging_strategy](connected_vehicles)
+
+    def _execute_advanced_charging_strategies(self, charging_strategy: str, connected_vehicles: List[Any]) -> None:
+        """Execute advanced charging strategies that require foresight."""
+        if charging_strategy == "online_multi_period":
+            self._execute_online_multi_period_charging(connected_vehicles)
+        elif charging_strategy == "integrated_storage":
+            self._execute_integrated_storage_charging(connected_vehicles)
+
+    def _execute_uncontrolled_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute uncontrolled charging strategy."""
+        charge_algos.uncontrolled(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_average_power_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute average power charging strategy."""
+        charge_algos.average_power(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_fcfs_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute first-come-first-served charging strategy."""
+        charge_algos.first_come_first_served(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_edf_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute earliest deadline first charging strategy."""
+        charge_algos.earliest_deadline_first(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_llf_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute least laxity first charging strategy."""
+        charge_algos.least_laxity_first(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_equal_sharing_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute equal sharing charging strategy."""
+        charge_algos.equal_sharing(
+            env=self.env,
+            connected_vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            charging_capacity=self.charging_capa,
+            free_grid_capacity=self.free_grid_capa_actual,
+            planning_period_length=self.planning_interval,
+        )
+
+    def _execute_online_myopic_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute online myopic charging strategy."""
+        charge_algos.online_myopic(
+            vehicles=connected_vehicles,
+            charging_stations=self.chargers,
+            env=self.env,
+            grid_capacity=self.free_grid_capa_actual,
+            optimization_period_length=self.optimization_period_length,
+            alpha=0,
+        )
+
+    def _execute_online_multi_period_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute online multi-period charging strategy."""
+        self._update_peak_threshold()
+        
+        if connected_vehicles:
+            charge_algos.online_multi_period(
                 vehicles=connected_vehicles,
                 charging_stations=self.chargers,
                 env=self.env,
-                grid_capacity=self.free_grid_capa_actual,
+                free_grid_capa_actual=self.free_grid_capa_actual,
+                free_grid_capa_predicted=self.free_grid_capa_predicted,
+                peak_load_history=self.peak_load_history,
+                electricity_cost=self.electricity_tariff,
+                sim_time=self.sim_time,
+                service_level=self.service_level,
                 optimization_period_length=self.optimization_period_length,
-                alpha=0,
+                num_lookahead_planning_periods=4,
+                flex_margin=0.5,
+                peak_threshold=self.peak_threshold,
             )
 
-        # Charging algos that DO require foresight
+    def _execute_integrated_storage_charging(self, connected_vehicles: List[Any]) -> None:
+        """Execute integrated storage charging strategy."""
+        if connected_vehicles:
+            charge_algos.integrated_charging_storage(
+                storage=self.electric_storage,
+                vehicles=connected_vehicles,
+                charging_stations=self.chargers,
+                env=self.env,
+                free_grid_capa_actual=self.free_grid_capa_actual,
+                free_grid_capa_predicted=self.free_grid_capa_predicted,
+                peak_load_history=self.peak_load_history,
+                electricity_cost=self.electricity_tariff,
+                sim_time=self.sim_time,
+                service_level=self.service_level,
+                optimization_period_length=self.optimization_period_length,
+                num_lookahead_planning_periods=12,
+                flex_margin=0.5,
+            )
 
-        if charging_strategy == "online_multi_period":
-            if max(self.charging_hub.grid.grid_usage) > self.peak_threshold:
-                self.peak_threshold = max(self.charging_hub.grid.grid_usage)
-            if len(connected_vehicles) > 0:
-                charge_algos.online_multi_period(
-                    vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    env=self.env,
-                    free_grid_capa_actual=self.free_grid_capa_actual,
-                    free_grid_capa_predicted=self.free_grid_capa_predicted,
-                    peak_load_history=self.peak_load_history,
-                    electricity_cost=self.electricity_tariff,
-                    sim_time=self.sim_time,
-                    service_level=self.service_level,
-                    optimization_period_length=self.optimization_period_length,
-                    num_lookahead_planning_periods=4,
-                    flex_margin=0.5,
-                    peak_threshold=self.peak_threshold,
-                )
-
-        if charging_strategy == "integrated_storage":
-            if len(connected_vehicles) > 0:
-                charge_algos.integrated_charging_storage(
-                    storage=self.electric_storage,
-                    vehicles=connected_vehicles,
-                    charging_stations=self.chargers,
-                    env=self.env,
-                    free_grid_capa_actual=self.free_grid_capa_actual,
-                    free_grid_capa_predicted=self.free_grid_capa_predicted,
-                    peak_load_history=self.peak_load_history,
-                    electricity_cost=self.electricity_tariff,
-                    sim_time=self.sim_time,
-                    service_level=self.service_level,
-                    optimization_period_length=self.optimization_period_length,
-                    num_lookahead_planning_periods=12,
-                    flex_margin=0.5,
-                )
+    def _update_peak_threshold(self) -> None:
+        """Update peak threshold based on current grid usage."""
+        current_peak = max(self.charging_hub.grid.grid_usage)
+        if current_peak > self.peak_threshold:
+            self.peak_threshold = current_peak
     def take_learning_charging_actions(self, charging_strategy):
         if charging_strategy == "dynamic":
             self.update_vehicles_status()

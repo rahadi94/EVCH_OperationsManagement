@@ -38,10 +38,10 @@ class Configuration:
         self.B2G = False
         self.benchmarking = False
         self.random_demand = False
-        self.data_source = 'ACN'
+        self.data_source = 'ARKINVEST' # from ['ACN', 'ARKINVEST']
         # if self.benchmarking:
         #     self.peak_cost = 0
-        self.remove_low_request_EVs = True
+        self.remove_low_request_EVs = False
         self.evaluation_after_training = False
         self.demand_threshold = 0
         self.duration_threshold = 1000000
@@ -68,7 +68,7 @@ class Configuration:
         prices = [1, 0.2]
         power = [11, 50]
         parking_price = 0
-        price_parameters = [0.5, 0]
+        price_parameters = [1.5, 0]
         self.max_price_ToU = 1.5
         self.degree_of_power_in_price_function = 1  # Don't change this :D
         # self.pricing_agent_name = 'pricing_single_22'
