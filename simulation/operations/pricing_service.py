@@ -107,7 +107,12 @@ class PricingService:
             if config.dynamic_storage_scheduling:
                 self.op.storage_agent.action = [rescaled_actions[1]]
 
-            self.op.conduct_storage_action(given_storage_action=[rescaled_actions[1]])
+            # Use storage service instead of direct call
+            if hasattr(self.op, 'storage_service'):
+                self.op.storage_service.conduct_storage_action(given_storage_action=[rescaled_actions[1]])
+            else:
+                # Fallback for backward compatibility
+                self.op.conduct_storage_action(given_storage_action=[rescaled_actions[1]])
 
         # Reset reward at the end
         self.op.charging_hub.grid.reset_reward()
