@@ -3,6 +3,10 @@ from simulation.operations.agents_controller import AgentsController
 from utilities.rl_agents.adapters.pricing_adapter import PricingEnvAgentAdapter
 from utilities.rl_agents.adapters.charging_adapter import ChargingEnvAgentAdapter
 from utilities.rl_agents.adapters.storage_adapter import StorageEnvAgentAdapter
+from utilities.rl_agents.adapters.gym_agent_adapter import (
+    GymPricingAgentAdapter, GymChargingAgentAdapter, GymStorageAgentAdapter,
+    create_gym_pricing_adapter, create_gym_charging_adapter, create_gym_storage_adapter
+)
 from utilities.rl_environments.rl_pricing_env import PricingEnv
 
 
@@ -92,6 +96,96 @@ def build_agents_controller(
     
     if storage_agent and storage_config:
         storage_adapter = build_storage_adapter(storage_config, storage_agent)
+    
+    return AgentsController(
+        pricing=pricing_adapter,
+        charging=charging_adapter,
+        storage=storage_adapter
+    )
+
+
+# Gym-compatible agent factory functions
+def build_gym_pricing_adapter(config_dict: Dict[str, Any], gym_agent: Any, **kwargs) -> GymPricingAgentAdapter:
+    """
+    Build a gym-compatible pricing agent adapter.
+    
+    Args:
+        config_dict: Configuration dictionary for the environment
+        gym_agent: Gym-compatible RL agent (e.g., Stable Baselines3 agent)
+        **kwargs: Additional arguments for environment creation
+        
+    Returns:
+        GymPricingAgentAdapter instance
+    """
+    return create_gym_pricing_adapter(config_dict, gym_agent, **kwargs)
+
+
+def build_gym_charging_adapter(config_dict: Dict[str, Any], gym_agent: Any, **kwargs) -> GymChargingAgentAdapter:
+    """
+    Build a gym-compatible charging agent adapter.
+    
+    Args:
+        config_dict: Configuration dictionary for the environment
+        gym_agent: Gym-compatible RL agent (e.g., Stable Baselines3 agent)
+        **kwargs: Additional arguments for environment creation
+        
+    Returns:
+        GymChargingAgentAdapter instance
+    """
+    return create_gym_charging_adapter(config_dict, gym_agent, **kwargs)
+
+
+def build_gym_storage_adapter(config_dict: Dict[str, Any], gym_agent: Any, **kwargs) -> GymStorageAgentAdapter:
+    """
+    Build a gym-compatible storage agent adapter.
+    
+    Args:
+        config_dict: Configuration dictionary for the environment
+        gym_agent: Gym-compatible RL agent (e.g., Stable Baselines3 agent)
+        **kwargs: Additional arguments for environment creation
+        
+    Returns:
+        GymStorageAgentAdapter instance
+    """
+    return create_gym_storage_adapter(config_dict, gym_agent, **kwargs)
+
+
+def build_gym_agents_controller(
+    pricing_agent: Optional[Any] = None,
+    charging_agent: Optional[Any] = None,
+    storage_agent: Optional[Any] = None,
+    pricing_config: Optional[Dict[str, Any]] = None,
+    charging_config: Optional[Dict[str, Any]] = None,
+    storage_config: Optional[Dict[str, Any]] = None,
+    **kwargs
+) -> AgentsController:
+    """
+    Build an AgentsController with gym-compatible agents.
+    
+    Args:
+        pricing_agent: Gym-compatible RL agent for pricing
+        charging_agent: Gym-compatible RL agent for charging
+        storage_agent: Gym-compatible RL agent for storage
+        pricing_config: Configuration for pricing environment
+        charging_config: Configuration for charging environment
+        storage_config: Configuration for storage environment
+        **kwargs: Additional arguments for environment creation
+        
+    Returns:
+        AgentsController instance with gym-compatible agents
+    """
+    pricing_adapter = None
+    charging_adapter = None
+    storage_adapter = None
+    
+    if pricing_agent and pricing_config:
+        pricing_adapter = build_gym_pricing_adapter(pricing_config, pricing_agent, **kwargs)
+    
+    if charging_agent and charging_config:
+        charging_adapter = build_gym_charging_adapter(charging_config, charging_agent, **kwargs)
+    
+    if storage_agent and storage_config:
+        storage_adapter = build_gym_storage_adapter(storage_config, storage_agent, **kwargs)
     
     return AgentsController(
         pricing=pricing_adapter,
