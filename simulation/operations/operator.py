@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from simulation.operations.NonLinearAlgorithms import nonlinear_pricing
 from simulation.operations.Operator_utils import compute_free_grid_capacity
+from simulation.operations.pricing_service import PricingService
 from utilities.rl_environments.rl_pricing_env import convert_to_vector
 
 
@@ -79,6 +80,7 @@ class Operator:
         service_level: float,
         charging_hub: Any,
         minimum_served_demand: float,
+        agents_controller: Optional[Any] = None,
     ):
         """
         Initialize the Operator with simulation parameters and strategies.
@@ -129,6 +131,10 @@ class Operator:
         )
         self._init_agents_and_events()
         self._init_capacity_tracking()
+        # Optional RL agents controller (pricing/charging/storage)
+        self.agents_controller = agents_controller
+        # Pricing service composition
+        self.pricing_service = PricingService(operator=self, agents_controller=self.agents_controller)
         
         # Initialize based on configuration
         self._initialize_strategy_dependent_behavior()
@@ -545,92 +551,39 @@ class Operator:
 
     def take_dynamic_pricing_actions(self) -> None:
         """Execute dynamic pricing actions and update price history."""
-        self.get_exp_free_grid_capacity()
-        self.update_vehicles_status()
-        self.take_pricing_action()
-        self._update_dynamic_price_history()
+        self.pricing_service.take_dynamic_pricing_actions()
 
     def take_static_pricing_action(self) -> None:
         """Execute static pricing actions and update price history."""
-        self.get_exp_free_grid_capacity()
-        self.update_vehicles_status()
-        self._update_pricing_parameters()
-        self._update_static_price_history()
+        self.pricing_service.take_static_pricing_action()
 
     def _update_dynamic_price_history(self) -> None:
-        """Update price history for dynamic pricing modes."""
-        if self.pricing_mode == "Discrete":
-            self._add_discrete_price_to_history()
-        elif self.pricing_mode == "Continuous":
-            self._add_continuous_price_to_history()
+        # Backward-compat shim; delegate to service
+        self.pricing_service._update_dynamic_price_history()
 
     def _update_static_price_history(self) -> None:
-        """Update price history for static pricing modes."""
-        if self.pricing_mode == "Discrete":
-            self._add_discrete_price_to_history()
-        elif self.pricing_mode in ["Continuous", "ToU"]:
-            self._add_continuous_price_to_history()
+        self.pricing_service._update_static_price_history()
 
     def _update_pricing_parameters(self) -> None:
-        """Update pricing parameters based on current mode and time."""
-        if self.pricing_mode == "ToU":
-            self._update_tou_pricing()
-        elif self.pricing_mode == "perfect_info":
-            self._update_perfect_info_pricing()
+        self.pricing_service._update_pricing_parameters()
 
     def _update_tou_pricing(self) -> None:
-        """Update Time-of-Use pricing parameters."""
-        hour = self._get_current_hour()
-        max_price = Configuration.instance().max_price_ToU
-        self.pricing_parameters[0] = (
-            self.electricity_tariff[hour] / max(self.electricity_tariff) * max_price
-        )
+        self.pricing_service._update_tou_pricing()
 
     def _update_perfect_info_pricing(self) -> None:
-        """Update perfect information pricing parameters."""
-        hour = self._get_current_hour()
-        config = Configuration.instance()
-        
-        if config.dynamic_fix_term_pricing:
-            self.pricing_parameters[1] = self.price_schedules[1][hour]
-            self.pricing_parameters[0] = self.price_schedules[0][hour]
-        else:
-            self.pricing_parameters[1] = self.price_schedules[hour]
+        self.pricing_service._update_perfect_info_pricing()
 
     def _get_current_hour(self) -> int:
-        """Get current hour of the simulation."""
-        return int((self.env.now % 1440) / 60)
+        return self.pricing_service._get_current_hour()
 
     def _add_discrete_price_to_history(self) -> None:
-        """Add discrete pricing data to price history."""
-        self.price_history = pd.concat([
-            self.price_history,
-            pd.DataFrame(self.price_pairs[:, 1]).transpose(),
-        ])
+        self.pricing_service._add_discrete_price_to_history()
 
     def _add_continuous_price_to_history(self) -> None:
-        """Add continuous pricing data to price history."""
-        self.price_history = pd.concat([
-            self.price_history,
-            pd.DataFrame([
-                self.pricing_parameters[0], 
-                self.pricing_parameters[1]
-            ]).transpose(),
-        ])
+        self.pricing_service._add_continuous_price_to_history()
 
     def get_current_pricing_data(self) -> PricingData:
-        """
-        Get current pricing information as structured data.
-        
-        Returns:
-            PricingData: Current pricing information
-        """
-        return PricingData(
-            energy_price=self.pricing_parameters[0] if len(self.pricing_parameters) > 0 else 0.0,
-            parking_price=self.parking_fee,
-            pricing_mode=self.pricing_mode,
-            price_history=self.price_history
-        )
+        return self.pricing_service.get_current_pricing_data()
 
     # ============================================================================
     # CHARGING ACTION METHODS
@@ -808,7 +761,7 @@ class Operator:
             if self.storage_agent:
                 self.update_storage_agent()
         if self.charging_hub.dynamic_pricing:
-            self.update_pricing_agent()
+            self.pricing_service.update_pricing_agent()
 
     def get_charging_schedules_and_prices(self, charging_strategy, mode):
         """
@@ -1110,54 +1063,8 @@ class Operator:
         self.charging_hub.grid.reset_reward()
 
     def update_pricing_agent(self):
-        self.update_vehicles_status()
-
-        if not self.charging_agent:
-            # TODO: do we need to recalculate it?
-            self.charging_hub.reward["missed"] = self.reward_computing()
-
-        agent = self.pricing_agent
-        agent_name = agent.agent_name
-        config = agent.config
-
-        if agent_name == "SAC":
-            agent.conduct_action(agent.action, self.charging_hub, self.env)
-            eval_ep = agent.do_evaluation_iterations
-
-            if agent.time_for_critic_and_actor_to_learn() and not eval_ep:
-                for _ in range(agent.hyperparameters["learning_updates_per_learning_session"]):
-                    agent.learn()
-
-            mask = False if agent.global_step_number >= agent.environment._max_episode_steps else agent.done
-
-            agent.save_experience(
-                experience=(
-                    agent.state,
-                    agent.action,
-                    agent.reward,
-                    agent.next_state,
-                    mask,
-                )
-            )
-
-        elif agent_name == "DQN":
-            agent.conduct_action(agent.action, self.charging_hub, self.env)
-
-            if agent.time_for_q_network_to_learn():
-                for _ in range(agent.hyperparameters["learning_iterations"]):
-                    agent.learn()
-
-            agent.save_experience(
-                experience=(
-                    agent.state,
-                    agent.action,
-                    agent.reward,
-                    agent.next_state,
-                    False,
-                )
-            )
-
-        agent.global_step_number += 1
+        # Delegated to PricingService for backward compatibility
+        self.pricing_service.update_pricing_agent()
 
     def update_storage_agent(self):
 
