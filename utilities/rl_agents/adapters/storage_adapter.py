@@ -58,7 +58,7 @@ class StorageEnvAgentAdapter(StorageAgent):
         self.rl_agent.episode_step_number_val = 0
         
         # Get action from the RL agent
-        action_raw = self.rl_agent.pick_action(eval_ep, charging_hub)
+        action_raw = self.rl_agent.pick_action(eval_ep)
         self.current_action = action_raw
         
         return {"storage_action": action_raw}

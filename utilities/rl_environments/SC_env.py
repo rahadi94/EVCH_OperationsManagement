@@ -10,7 +10,7 @@ class ChargingHubInvestmentEnv(gym.Env):
     reward_range = (-float("inf"), float("inf"))
     spec = None
 
-    def __init__(self, config):
+    def __init__(self, config, charging_hub=None, env=None):
         # Set these in ALL subclasses
         self.action_space = spaces.Box(
             low=0,
@@ -26,8 +26,8 @@ class ChargingHubInvestmentEnv(gym.Env):
             shape=(config.number_chargers * 3 + 2 + 5,),
             dtype=np.float64,
         )
-        self.charging_hub = None
-        self.env = None
+        self.charging_hub = charging_hub
+        self.env = env
         self.id = 1
         self.episode = 0
         # vehicles_to_decide = [vehicle for vehicle in self.fleet.vehicles if vehicle.mode in ['idle','parking','circling']][0:10]
@@ -129,7 +129,7 @@ class ChargingHubInvestmentEnv(gym.Env):
                 state = np.append(state, charger_state)
         return state
 
-    def step(self, action, charging_hub=None, env=None):
+    def step(self, action):
         # Execute one time step within the environment
         # the first action is charging/discharging of the battery
         # storage_power = action[0]
@@ -144,9 +144,9 @@ class ChargingHubInvestmentEnv(gym.Env):
         #     if len(charging_vehicles) > 0:
         #         charging_vehicles[0].charging_power = action[i+1]
         self.current_step += 1
-        reward = self._take_action(action, charging_hub, env)
+        reward = self._take_action(action)
         done = self.current_step >= 100000000000000
-        obs = self._next_observation(charging_hub, env)
+        obs = self._next_observation()
         return obs, reward, done, {}
 
     def receive_action(self):
@@ -165,28 +165,130 @@ class ChargingHubInvestmentEnv(gym.Env):
     def render(self, mode="human", close=False):
         print(self.reward)
 
-    def _take_action(self, action, charging_hub, env):
+    def _take_action(self, action):
 
         reward = 0
         penalty_ratio = 0.001
-        reward -= charging_hub.reward["missed"]
-        reward -= charging_hub.reward["feasibility"] * penalty_ratio
-        # reward -= charging_hub.reward['feasibility_storage'] * penalty_ratio
+        reward -= self.charging_hub.reward["missed"]
+        reward -= self.charging_hub.reward["feasibility"] * penalty_ratio
+        # reward -= self.charging_hub.reward['feasibility_storage'] * penalty_ratio
 
-        self.total_reward["missed"] -= charging_hub.reward["missed"]
+        self.total_reward["missed"] -= self.charging_hub.reward["missed"]
         # print(f'charging:{self.total_reward["missed"]}')
         self.total_reward["feasibility"] -= (
-            charging_hub.reward["feasibility"] * penalty_ratio
+            self.charging_hub.reward["feasibility"] * penalty_ratio
         )
-        # self.total_reward['feasibility_storage'] -= charging_hub.reward['feasibility_storage'] * penalty_ratio
-        self.total_reward["energy"] -= charging_hub.grid.energy_rewards * 0
+        # self.total_reward['feasibility_storage'] -= self.charging_hub.reward['feasibility_storage'] * penalty_ratio
+        self.total_reward["energy"] -= self.charging_hub.grid.energy_rewards * 0
 
-        if not charging_hub.dynamic_pricing:
-            charging_hub.reward["missed"] = 0
-            charging_hub.reward["feasibility_storage"] = 0
-            charging_hub.reward["feasibility"] = 0
+        if not self.charging_hub.dynamic_pricing:
+            self.charging_hub.reward["missed"] = 0
+            self.charging_hub.reward["feasibility_storage"] = 0
+            self.charging_hub.reward["feasibility"] = 0
 
         return reward / 100
 
-    def _next_observation(self, charging_hub, env):
-        return self.get_state(charging_hub, env)
+    def _next_observation(self):
+        return self.get_state(self.charging_hub, self.env)
+    
+    def penalty_action(self, action):
+        """
+        Calculate feasibility penalties for charging actions.
+        This method was moved from SAC.py to keep simulation logic in the environment.
+        """
+        if not self.charging_hub:
+            return
+            
+        vehicle_state = self.state[24 + 5 + 5 :] if hasattr(self, 'state') else []
+        ### check charging action
+        total_usage = np.array([])
+        i = 0
+        for charger in self.charging_hub.chargers:
+            associated_power = np.array([])
+            for j in range(charger.number_of_connectors):
+                maximum_power = charger.power
+                if vehicle_state[i * 3] <= 0:
+                    self.charging_hub.reward["feasibility"] += action[i + 1]
+                else:
+                    associated_power = np.append(associated_power, action[i + 1])
+                    total_usage = np.append(total_usage, action[i + 1])
+                i += 1
+            surplus_per_charger = max(associated_power.sum() - maximum_power, 0)
+            self.charging_hub.reward["feasibility"] += surplus_per_charger
+        total_surplus = max(
+            total_usage.sum() - self.charging_hub.operator.free_grid_capa_actual[0], 0
+        )
+        self.charging_hub.reward["feasibility"] += total_surplus
+    
+    def checked_action(self, action):
+        """
+        Check and adjust charging actions for feasibility.
+        This method was moved from SAC.py to keep simulation logic in the environment.
+        """
+        if not self.charging_hub:
+            return action
+            
+        vehicle_state = self.state[24 + 5 + 5 :] if hasattr(self, 'state') else []
+        ### check charging action
+        i = 0
+        for charger in self.charging_hub.chargers:
+            lower_bound = i + 1
+            for j in range(charger.number_of_connectors):
+                maximum_power = charger.power
+                if vehicle_state[i * 3] <= 0:
+                    action[i + 1] = 0
+                i += 1
+            upper_bound = i + 1
+
+            while action[lower_bound:upper_bound].sum() > maximum_power:
+                number_active_chargers = len(
+                    [f for f in action[lower_bound:upper_bound] if f > 0]
+                )
+                surplus_per_charger = (
+                    max(action[lower_bound:upper_bound].sum() - maximum_power, 0)
+                    / number_active_chargers
+                )
+                action[lower_bound:upper_bound] -= surplus_per_charger
+                for c in range(len(action[lower_bound:upper_bound])):
+                    action[lower_bound:upper_bound][c] = max(
+                        action[lower_bound:upper_bound][c], 0
+                    )
+
+        storage_object = self.charging_hub.electric_storage
+        storage_object.SoC = min(
+            storage_object.SoC, storage_object.max_energy_stored_kWh
+        )
+        storage_object.SoC = max(storage_object.SoC, 0)
+        if action[0] >= 0:
+            if (
+                storage_object.SoC + action[0] / 60 * self.charging_hub.planning_interval
+                > storage_object.max_energy_stored_kWh
+            ):
+                action[0] = (
+                    storage_object.max_energy_stored_kWh - storage_object.SoC
+                ) / (60 * self.charging_hub.planning_interval)
+            action[0] = min(action[0], self.charging_hub.operator.free_grid_capa_actual[0])
+
+        # discharge rate cannot exceed SoC, and hub demand (i.e., no infeed)
+        if action[0] < 0:
+            if storage_object.SoC <= 0:
+                action[0] = 0
+            elif (
+                storage_object.SoC + (action[0] / 60 * self.charging_hub.planning_interval)
+                < 0
+            ):
+                action[0] = -max(
+                    (storage_object.SoC) / (60 * self.charging_hub.planning_interval), 0
+                )
+
+        while action.sum() - self.charging_hub.operator.free_grid_capa_actual[0] > 0:
+            number_active_chargers = len([a for a in action if a > 0])
+            surplus_per_charger = (
+                max(action.sum() - self.charging_hub.operator.free_grid_capa_actual[0], 0)
+                / number_active_chargers
+            )
+            for i in range(1, len(action)):
+                action[i] = max(action[i] - surplus_per_charger, 0)
+            # if action[0]>0:
+            #     action[0] = max(action[0] - surplus_per_charger, 0)
+        return action

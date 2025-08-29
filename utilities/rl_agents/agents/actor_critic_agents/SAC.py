@@ -229,8 +229,7 @@ class SAC(Base_Agent):
         if self.add_extra_noise:
             self.noise.reset()
 
-    def step(self, charging_hub, env):
-        pass
+    def step(self):
         """Runs an episode on the game, saving the experience and running a learning step if appropriate"""
         eval_ep = (
             self.episode_number % TRAINING_EPISODES_PER_EVAL_EPISODE == 0
@@ -238,8 +237,8 @@ class SAC(Base_Agent):
         )
         self.episode_step_number_val = 0
         # while not self.done:
-        self.action = self.pick_action(eval_ep, charging_hub)
-        self.conduct_action(self.action, charging_hub, env)
+        self.action = self.pick_action(eval_ep)
+        self.conduct_action(self.action)
         if self.time_for_critic_and_actor_to_learn():
             for _ in range(
                 self.hyperparameters["learning_updates_per_learning_session"]
@@ -257,110 +256,22 @@ class SAC(Base_Agent):
         self.state = self.next_state
         self.global_step_number += 1
 
-        # print(self.pick_action(eval_ep, charging_hub, state=self.environment.get_state(None, None)))
-
     def rescale_action(self, action):
         return (
             action * (self.action_range[1] - self.action_range[0]) / 2.0
             + (self.action_range[1] + self.action_range[0]) / 2.0
         )
 
-    def descale_action(self, action, charging_hub):
+    def descale_action(self, action):
 
         actions = (action - ((self.action_range[1] + self.action_range[0]) / 2.0)) / (
             (self.action_range[1] - self.action_range[0]) / 2
         )
         return actions
 
-    def penalty_action(self, action, charging_hub):
-        vehicle_state = self.state[24 + 5 + 5 :]
-        ### check charging action
-        total_usage = np.array([])
-        i = 0
-        for charger in charging_hub.chargers:
-            associated_power = np.array([])
-            for j in range(charger.number_of_connectors):
-                maximum_power = charger.power
-                if vehicle_state[i * 3] <= 0:
-                    charging_hub.reward["feasibility"] += action[i + 1]
-                else:
-                    associated_power = np.append(associated_power, action[i + 1])
-                    total_usage = np.append(total_usage, action[i + 1])
-                i += 1
-            surplus_per_charger = max(associated_power.sum() - maximum_power, 0)
-            charging_hub.reward["feasibility"] += surplus_per_charger
-        total_surplus = max(
-            total_usage.sum() - charging_hub.operator.free_grid_capa_actual[0], 0
-        )
-        charging_hub.reward["feasibility"] += total_surplus
 
-    def checked_action(self, action, charging_hub):
-        vehicle_state = self.state[24 + 5 + 5 :]
-        ### check charging action
-        i = 0
-        for charger in charging_hub.chargers:
-            lower_bound = i + 1
-            for j in range(charger.number_of_connectors):
-                maximum_power = charger.power
-                if vehicle_state[i * 3] <= 0:
-                    action[i + 1] = 0
-                i += 1
-            upper_bound = i + 1
 
-            while action[lower_bound:upper_bound].sum() > maximum_power:
-                number_active_chargers = len(
-                    [f for f in action[lower_bound:upper_bound] if f > 0]
-                )
-                surplus_per_charger = (
-                    max(action[lower_bound:upper_bound].sum() - maximum_power, 0)
-                    / number_active_chargers
-                )
-                action[lower_bound:upper_bound] -= surplus_per_charger
-                for c in range(len(action[lower_bound:upper_bound])):
-                    action[lower_bound:upper_bound][c] = max(
-                        action[lower_bound:upper_bound][c], 0
-                    )
-
-        storage_object = charging_hub.electric_storage
-        storage_object.SoC = min(
-            storage_object.SoC, storage_object.max_energy_stored_kWh
-        )
-        storage_object.SoC = max(storage_object.SoC, 0)
-        if action[0] >= 0:
-            if (
-                storage_object.SoC + action[0] / 60 * charging_hub.planning_interval
-                > storage_object.max_energy_stored_kWh
-            ):
-                action[0] = (
-                    storage_object.max_energy_stored_kWh - storage_object.SoC
-                ) / (60 * charging_hub.planning_interval)
-            action[0] = min(action[0], charging_hub.operator.free_grid_capa_actual[0])
-
-        # discharge rate cannot exceed SoC, and hub demand (i.e., no infeed)
-        if action[0] < 0:
-            if storage_object.SoC <= 0:
-                action[0] = 0
-            elif (
-                storage_object.SoC + (action[0] / 60 * charging_hub.planning_interval)
-                < 0
-            ):
-                action[0] = -max(
-                    (storage_object.SoC) / (60 * charging_hub.planning_interval), 0
-                )
-
-        while action.sum() - charging_hub.operator.free_grid_capa_actual[0] > 0:
-            number_active_chargers = len([a for a in action if a > 0])
-            surplus_per_charger = (
-                max(action.sum() - charging_hub.operator.free_grid_capa_actual[0], 0)
-                / number_active_chargers
-            )
-            for i in range(1, len(action)):
-                action[i] = max(action[i] - surplus_per_charger, 0)
-            # if action[0]>0:
-            #     action[0] = max(action[0] - surplus_per_charger, 0)
-        return action
-
-    def pick_action(self, eval_ep, charging_hub=None, state=None):
+    def pick_action(self, eval_ep, state=None):
         """Picks an action using one of three methods: 1) Randomly if we haven't passed a certain number of steps,
         2) Using the actor in evaluation mode if eval_ep is True  3) Using the actor in training mode if eval_ep is False.
         The difference between evaluation and training mode is that training mode does more exploration
@@ -376,13 +287,13 @@ class SAC(Base_Agent):
             #         action[i] = max(action[i], -1)
             #         action[i] = min(action[i], 1)
             # action = self.rescale_action(action)
-            # action = self.checked_action(action, charging_hub)
+            # action = self.checked_action(action)
         elif (
             self.global_step_number < self.hyperparameters["min_steps_before_learning"]
         ):
             action = self.environment.action_space.sample().astype("float64")
-            action = self.descale_action(action, charging_hub)
-            # action = self.checked_action(action, charging_hub)
+            action = self.descale_action(action)
+            # action = self.checked_action(action)
         else:
             action = self.actor_pick_action(state=state)
             if self.add_extra_noise:
@@ -392,7 +303,7 @@ class SAC(Base_Agent):
                     action[i] = max(action[i], -1)
                     action[i] = min(action[i], 1)
             # action = self.rescale_action(action)
-            # action = self.checked_action(action, charging_hub)
+            # action = self.checked_action(action)
         return action
 
     def actor_pick_action(self, state=None, eval=False):

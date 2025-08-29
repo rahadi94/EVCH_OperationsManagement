@@ -87,11 +87,11 @@ class EVCHGymEnv(gym.Env):
     def _init_underlying_env(self):
         """Initialize the underlying environment based on agent type."""
         if self.agent_type == AgentType.PRICING:
-            self.underlying_env = PricingEnv(self.config, DQN=False)
+            self.underlying_env = PricingEnv(self.config, DQN=False, charging_hub=None, env=None)
         elif self.agent_type == AgentType.CHARGING:
-            self.underlying_env = ChargingHubInvestmentEnv(self.config)
+            self.underlying_env = ChargingHubInvestmentEnv(self.config, charging_hub=None, env=None)
         elif self.agent_type == AgentType.STORAGE:
-            self.underlying_env = StorageEnv(self.config)
+            self.underlying_env = StorageEnv(self.config, charging_hub=None, env=None)
         else:
             raise ValueError(f"Unknown agent type: {self.agent_type}")
     

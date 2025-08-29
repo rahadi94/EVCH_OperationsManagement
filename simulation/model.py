@@ -628,26 +628,32 @@ class EVCC_Sim_Model:
         
         # Setup charging agent
         if self.charging_agent:
+            # Set charging_hub and env in the environment
+            self.charging_agent.environment.charging_hub = self
+            self.charging_agent.environment.env = self.env
             self.charging_agent.environment.state = (
                 self.charging_agent.environment.get_state(self, self.env)
             )
-            self.charging_agent.environment.env = self.env
             self.charging_agent.reset_game()
         
         # Setup pricing agent
         if self.pricing_agent:
+            # Set charging_hub and env in the environment
+            self.pricing_agent.environment.charging_hub = self
+            self.pricing_agent.environment.env = self.env
             self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
                 self, self.env
             )
-            self.pricing_agent.environment.env = self.env
             self.pricing_agent.reset_game()
         
         # Setup storage agent
         if self.storage_agent:
+            # Set charging_hub and env in the environment
+            self.storage_agent.environment.charging_hub = self
+            self.storage_agent.environment.env = self.env
             self.storage_agent.environment.state = (
                 self.storage_agent.environment.get_state(self, self.env)
             )
-            self.storage_agent.environment.env = self.env
             self.storage_agent.reset_game()
         
         # Link agents to operator

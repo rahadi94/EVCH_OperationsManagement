@@ -77,7 +77,7 @@ class PricingService:
                     self.op.price_pairs[i, 1] = price
 
             elif agent_name == "SAC":
-                self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep, self.op.charging_hub)
+                self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep)
                 rescaled_actions = self.op.pricing_agent.environment.rescale_action(self.op.pricing_agent.action)
                 number_of_power_options = len(self.op.price_pairs[:, 1])
                 final_pricing = rescaled_actions[:number_of_power_options]
@@ -85,7 +85,7 @@ class PricingService:
                 self.op.price_pairs[1, 1] = min(final_pricing[1], 1.5)
 
         elif pricing_mode == "Continuous":
-            self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep, self.op.charging_hub)
+            self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep)
             rescaled_actions = self.op.pricing_agent.environment.rescale_action(self.op.pricing_agent.action)
 
             config = Configuration.instance()
@@ -121,14 +121,14 @@ class PricingService:
         self.op.update_vehicles_status()
 
         if not self.op.charging_agent:
-            self.op.charging_hub.reward["missed"] = self.op.reward_computing()
+            self.op.charging_hub.reward["profit"] = self.op.reward_computing()
 
         agent = self.op.pricing_agent
         agent_name = agent.agent_name
         # config = agent.config  # not used here directly
 
         if agent_name == "SAC":
-            agent.conduct_action(agent.action, self.op.charging_hub, self.op.env)
+            agent.conduct_action(agent.action)
             eval_ep = agent.do_evaluation_iterations
 
             if agent.time_for_critic_and_actor_to_learn() and not eval_ep:
@@ -148,7 +148,7 @@ class PricingService:
             )
 
         elif agent_name == "DQN":
-            agent.conduct_action(agent.action, self.op.charging_hub, self.op.env)
+            agent.conduct_action(agent.action)
 
             if agent.time_for_q_network_to_learn():
                 for _ in range(agent.hyperparameters["learning_iterations"]):

@@ -10,7 +10,7 @@ class StorageEnv(gym.Env):
     reward_range = (-float("inf"), float("inf"))
     spec = None
 
-    def __init__(self, config):
+    def __init__(self, config, charging_hub=None, env=None):
         # Set these in ALL subclasses
         self.action_space = spaces.Box(low=250, high=800, shape=(1,), dtype=np.float64)
         self.observation_space = spaces.Box(
@@ -19,8 +19,8 @@ class StorageEnv(gym.Env):
             shape=(config.number_chargers * 3 + 24 + 5 + 5,),
             dtype=np.float64,
         )
-        self.charging_hub = None
-        self.env = None
+        self.charging_hub = charging_hub
+        self.env = env
         self.id = 1
         self.episode = 0
         # vehicles_to_decide = [vehicle for vehicle in self.fleet.vehicles if vehicle.mode in ['idle','parking','circling']][0:10]
@@ -104,7 +104,7 @@ class StorageEnv(gym.Env):
         # print(len(state))
         return state
 
-    def step(self, action, charging_hub=None, env=None):
+    def step(self, action):
         # Execute one time step within the environment
         # the first action is charging/discharging of the battery
         # storage_power = action[0]
@@ -119,9 +119,9 @@ class StorageEnv(gym.Env):
         #     if len(charging_vehicles) > 0:
         #         charging_vehicles[0].charging_power = action[i+1]
         self.current_step += 1
-        reward = self._take_action(action, charging_hub, env)
+        reward = self._take_action(action)
         done = self.current_step >= 100000000000000
-        obs = self._next_observation(charging_hub, env)
+        obs = self._next_observation()
         return obs, reward, done, {}
 
     def receive_action(self):
@@ -140,21 +140,21 @@ class StorageEnv(gym.Env):
     def render(self, mode="human", close=False):
         print(self.reward)
 
-    def _take_action(self, action, charging_hub, env):
+    def _take_action(self, action):
         #
         # state = state.reshape((1, self._state_size))
         # lg.info(f'old_state={fleet.old_state}, old_action={fleet.old_action}')
         # lg.info(f'new_action={action}, new_state={state}, {fleet.charging_count}')
         reward = 0
-        reward -= charging_hub.reward["missed"]
+        reward -= self.charging_hub.reward["missed"]
 
-        charging_hub.reward["missed"] = 0
+        self.charging_hub.reward["missed"] = 0
         ### TODO add the energy rewards to reward["costs"]
         # charging_hub.grid.energy_rewards = 0
-        charging_hub.reward["feasibility"] = 0
-        charging_hub.reward["feasibility_storage"] = 0
+        self.charging_hub.reward["feasibility"] = 0
+        self.charging_hub.reward["feasibility_storage"] = 0
 
         return reward
 
-    def _next_observation(self, charging_hub, env):
-        return self.get_state(charging_hub, env)
+    def _next_observation(self):
+        return self.get_state(self.charging_hub, self.env)

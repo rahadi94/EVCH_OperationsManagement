@@ -51,13 +51,15 @@ class PricingEnv(gym.Env):
     K = 5  # Base for discrete action encoding
     MAX_EPISODE_STEPS = 50000000
     
-    def __init__(self, config: Any, DQN: bool = False):
+    def __init__(self, config: Any, DQN: bool = False, charging_hub: Optional[Any] = None, env: Optional[Any] = None):
         """
         Initialize the pricing environment.
         
         Args:
             config: Configuration object containing environment parameters
             DQN: Whether to use discrete action space for DQN
+            charging_hub: Reference to the charging hub
+            env: Reference to the simulation environment
         """
         super().__init__()
         
@@ -73,8 +75,8 @@ class PricingEnv(gym.Env):
         self._init_observation_space()
         
         # Environment state
-        self.charging_hub = None
-        self.env = None
+        self.charging_hub = charging_hub
+        self.env = env
         self.current_step = 0
         self.reward = 0.0
         self.action = None
@@ -470,22 +472,20 @@ class PricingEnv(gym.Env):
             # If we can't access grid capacity, return 0
             return 0.0
     
-    def step(self, action: np.ndarray, charging_hub: Optional[Any] = None, env: Optional[Any] = None) -> Tuple[np.ndarray, float, bool, Dict]:
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict]:
         """
         Take a step in the environment.
         
         Args:
             action: Action to take
-            charging_hub: Reference to the charging hub
-            env: Reference to the simulation environment
             
         Returns:
             Tuple of (observation, reward, done, info)
         """
         self.current_step += 1
-        reward = self._take_action(action, charging_hub, env)
+        reward = self._take_action(action)
         done = self.current_step >= self.MAX_EPISODE_STEPS
-        obs = self._next_observation(charging_hub, env)
+        obs = self._next_observation()
         
         return obs, reward, done, {}
     
@@ -512,14 +512,12 @@ class PricingEnv(gym.Env):
         if mode == "human":
             print(f"Pricing Environment - Reward: {self.reward}")
     
-    def _take_action(self, action: np.ndarray, charging_hub: Optional[Any], env: Optional[Any]) -> float:
+    def _take_action(self, action: np.ndarray) -> float:
         """
         Execute the action and calculate reward.
         
         Args:
             action: Action to execute
-            charging_hub: Reference to the charging hub
-            env: Reference to the simulation environment
             
         Returns:
             Reward value
@@ -528,13 +526,13 @@ class PricingEnv(gym.Env):
         self.action = action
         
         # Calculate reward using the single reward calculation method
-        reward = self._calculate_reward(action, charging_hub, env)
+        reward = self._calculate_reward(action)
         
         return reward
     
 
     
-    def _calculate_reward(self, action: np.ndarray, charging_hub: Optional[Any], env: Optional[Any]) -> float:
+    def _calculate_reward(self, action: np.ndarray) -> float:
         """
         Calculate reward using the simulation-based approach with operator.reward_computing().
         
@@ -543,35 +541,33 @@ class PricingEnv(gym.Env):
         
         Args:
             action: Action to execute
-            charging_hub: Reference to the charging hub
-            env: Reference to the simulation environment
             
         Returns:
             float: Calculated reward value
         """
         reward = 0.0
         
-        if charging_hub:
+        if self.charging_hub:
             # 1. OPERATOR REWARD COMPUTING (primary reward source)
             # Use the operator's reward_computing method which includes:
             # - Peak threshold violation penalties
             # - Objective function change rewards
-            if hasattr(charging_hub, 'operator') and charging_hub.operator:
+            if hasattr(self.charging_hub, 'operator') and self.charging_hub.operator:
                 try:
-                    operator_reward = charging_hub.operator.reward_computing()
+                    operator_reward = self.charging_hub.operator.reward_computing()
                     reward += operator_reward
                 except Exception as e:
                     print(f"Operator reward computing failed: {e}")
             
             # 2. MISSED PENALTIES (from simulation)
-            missed_penalty = charging_hub.reward.get("profit", 0)
-            reward -= missed_penalty
+            profit = self.charging_hub.reward.get("profit", 0)
+            reward -= profit
             self.total_reward["profit"] += reward
             
             # Reset rewards for next step
-            charging_hub.reward["profit"] = 0
-            charging_hub.reward["feasibility_storage"] = 0
-            charging_hub.reward["feasibility"] = 0
+            self.charging_hub.reward["profit"] = 0
+            self.charging_hub.reward["feasibility_storage"] = 0
+            self.charging_hub.reward["feasibility"] = 0
             
             # 3. FALLBACK REWARD (ensure non-zero rewards for learning)
             if reward == 0.0:
@@ -582,31 +578,17 @@ class PricingEnv(gym.Env):
                 self.current_step += 1
             else:
                 self.current_step = 1
-                
-            if self.current_step % 50 == 0:  # Print every 50 steps
-                print(f"🔍 Reward Debug (Step {self.current_step}):")
-                print(f"   Operator reward: {operator_reward if 'operator_reward' in locals() else 'N/A'}")
-                print(f"   Missed penalty: {missed_penalty}")
-                print(f"   Final reward: {reward}")
-                print(f"   Charging hub rewards: {charging_hub.reward}")
-                if hasattr(charging_hub, 'operator') and charging_hub.operator:
-                    print(f"   Peak threshold: {getattr(charging_hub.operator, 'peak_threshold', 'N/A')}")
-                    print(f"   Objective: {getattr(charging_hub.operator, 'objective', 'N/A')}")
         
         return reward
     
-    def _next_observation(self, charging_hub: Optional[Any], env: Optional[Any]) -> np.ndarray:
+    def _next_observation(self) -> np.ndarray:
         """
         Get the next observation.
         
-        Args:
-            charging_hub: Reference to the charging hub
-            env: Reference to the simulation environment
-            
         Returns:
             Next observation
         """
-        return self.get_state(charging_hub, env)
+        return self.get_state(self.charging_hub, self.env)
 
 
 def convert_to_scalar(action_vector: np.ndarray) -> int:

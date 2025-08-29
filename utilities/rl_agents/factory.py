@@ -22,7 +22,7 @@ def build_pricing_adapter(config: Any, policy: Any, dqn: bool = False) -> Pricin
     Returns:
         PricingEnvAgentAdapter instance
     """
-    env = PricingEnv(config, DQN=dqn)
+    env = PricingEnv(config, DQN=dqn, charging_hub=None, env=None)
     return PricingEnvAgentAdapter(env=env, policy=policy)
 
 
@@ -38,7 +38,7 @@ def build_charging_adapter(config: Any, policy: Any) -> ChargingEnvAgentAdapter:
         ChargingEnvAgentAdapter instance
     """
     from utilities.rl_environments.SC_env import ChargingHubInvestmentEnv
-    env = ChargingHubInvestmentEnv(config)
+    env = ChargingHubInvestmentEnv(config, charging_hub=None, env=None)
     return ChargingEnvAgentAdapter(rl_agent=policy, charging_env=env)
 
 
@@ -54,7 +54,7 @@ def build_storage_adapter(config: Any, policy: Any) -> StorageEnvAgentAdapter:
         StorageEnvAgentAdapter instance
     """
     from utilities.rl_environments.SC_storage_env import StorageEnv
-    env = StorageEnv(config)
+    env = StorageEnv(config, charging_hub=None, env=None)
     return StorageEnvAgentAdapter(rl_agent=policy, storage_env=env)
 
 
@@ -88,7 +88,7 @@ def build_agents_controller(
     
     if pricing_agent and pricing_config:
         if not pricing_env:
-            pricing_env = PricingEnv(pricing_config)
+            pricing_env = PricingEnv(pricing_config, charging_hub=None, env=None)
         pricing_adapter = PricingEnvAgentAdapter(rl_agent=pricing_agent, pricing_env=pricing_env)
     
     if charging_agent and charging_config:

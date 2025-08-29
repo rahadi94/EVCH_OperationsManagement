@@ -78,7 +78,7 @@ class ChargingService:
 
             eval_ep = self.op.charging_agent.do_evaluation_iterations
             self.op.charging_agent.episode_step_number_val = 0
-            action = self.op.charging_agent.pick_action(eval_ep, self.op.charging_hub)
+            action = self.op.charging_agent.pick_action(eval_ep)
             self.op.charging_agent.action = self.op.charging_agent.rescale_action(action)
     
     def conduct_charging_action(self) -> None:
@@ -112,7 +112,7 @@ class ChargingService:
         self.op.charging_hub.reward["missed"] = self.op.reward_computing()
 
         eval_ep = self.op.charging_agent.do_evaluation_iterations
-        self.op.charging_agent.conduct_action(self.op.charging_agent.action, self.op.charging_hub, self.op.env)
+        self.op.charging_agent.conduct_action(self.op.charging_agent.action)
         if self.op.charging_agent.time_for_critic_and_actor_to_learn():
             if not eval_ep:
                 for _ in range(
@@ -128,7 +128,7 @@ class ChargingService:
             else self.op.charging_agent.done
         )
         # if not eval_ep:
-        action = self.op.charging_agent.descale_action(self.op.charging_agent.action, self.op.charging_hub)
+        action = self.op.charging_agent.descale_action(self.op.charging_agent.action)
         self.op.charging_agent.save_experience(
             experience=(
                 self.op.charging_agent.state,
