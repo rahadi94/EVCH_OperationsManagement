@@ -46,7 +46,7 @@ class Vehicle:
         self.energy_requested = self.adjust_energy_request(
             energy_requested_input
         )  # energy_requested  # kWh
-        self.raw_energy_demand = self.energy_requested.copy()
+        self.raw_energy_demand = self.energy_requested  # No need for .copy() on float
         self.energy_requested = min(self.energy_requested, self.park_duration / 60 * 50)
         if pd.isna(self.energy_requested):
             self.energy_requested = 0
@@ -109,14 +109,33 @@ class Vehicle:
         :return:
         """
 
+        # Handle case where arrival_period is in the future or invalid
+        if self.arrival_period >= self.sim_time:
+            # Vehicle hasn't arrived yet, no energy request
+            return 0.0
+        
+        # Handle case where departure_period is in the past
+        if self.departure_period <= 0:
+            # Vehicle has already departed, no energy request
+            return 0.0
+        
+        # Handle case where park_duration is invalid
+        if self.park_duration <= 0:
+            return 0.0
+
         if self.departure_period <= self.sim_time:
+            # Vehicle will depart before simulation ends, use full energy request
             energy_request = energy_requested_input
         elif self.departure_period > self.sim_time:
-            energy_request = energy_requested_input * (
-                (self.sim_time - self.arrival_period) / self.park_duration
-            )
+            # Vehicle will stay beyond simulation end, prorate the energy request
+            time_in_simulation = max(0, self.sim_time - self.arrival_period)
+            energy_request = energy_requested_input * (time_in_simulation / self.park_duration)
+        else:
+            # Fallback case
+            energy_request = energy_requested_input
 
-        return energy_request
+        # Ensure energy request is non-negative
+        return max(0.0, energy_request)
 
     def set_average_power_requirement_level(self):
         laxity = self.energy_requested / (self.park_duration / 60)
@@ -244,10 +263,3 @@ class Vehicle:
         # self.remaining_laxity = self.remaining_energy_deficit/max(self.remaining_park_duration,1)
         # if self.mode in ['Connected']:
         #     print(f'id={self.id}, power={self.charging_power}')
-
-    def reset_profit_reward(self):
-        self.profit_reward = 0
-
-    def calculate_profit_reward(self, energy_price, electricity_tariff):
-        # hour = int((self.env.now % 1440 - self.env.now % 60) / 60)
-        self.profit_reward += self.charging_power / 60 * (energy_price)

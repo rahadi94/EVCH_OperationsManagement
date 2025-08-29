@@ -124,7 +124,7 @@ class ChargingService:
         mask = (
             False
             if self.op.charging_agent.episode_step_number_val
-            >= self.op.charging_agent.environment._max_episode_steps
+            >= self.op.charging_agent.environment.MAX_EPISODE_STEPS
             else self.op.charging_agent.done
         )
         # if not eval_ep:

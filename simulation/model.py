@@ -583,7 +583,7 @@ class EVCC_Sim_Model:
         self.costs = dict(investment=0, operations=0)
         self.objective_function = 0
         self.total_energy_charged = 0
-        self.reward = dict(costs=0, missed=0, feasibility=0, feasibility_storage=0)
+        self.reward = dict(costs=0, profit=0, feasibility=0, feasibility_storage=0)
         
         # Create operator
         self.operator = Operator(

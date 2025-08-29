@@ -261,14 +261,14 @@ def run_single_simulation(
             f"= {model.pricing_agent.environment.total_reward['missed']}"
         )
     if model.pricing_agent:
-        lg.error(f"profit ={model.pricing_agent.environment.total_reward['missed']}")
+        lg.error(f"profit ={model.pricing_agent.environment.total_reward['profit']}")
     if model.charging_agent:
         model.charging_agent.environment.total_reward["missed"] = 0
         model.charging_agent.environment.total_reward["feasibility"] = 0
         model.charging_agent.environment.total_reward["feasibility_storage"] = 0
         model.charging_agent.environment.total_reward["energy"] = 0
     if model.pricing_agent:
-        model.pricing_agent.environment.total_reward["missed"] = 0
+        model.pricing_agent.environment.total_reward["profit"] = 0
         model.pricing_agent._critic_loss = 0
         model.pricing_agent._policy_loss = 0
     # model.storage_agent.environment.total_reward['test'] = 0

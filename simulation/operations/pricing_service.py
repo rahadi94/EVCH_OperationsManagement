@@ -135,7 +135,7 @@ class PricingService:
                 for _ in range(agent.hyperparameters["learning_updates_per_learning_session"]):
                     agent.learn()
 
-            mask = False if agent.global_step_number >= agent.environment._max_episode_steps else agent.done
+            mask = False if agent.global_step_number >= agent.environment.MAX_EPISODE_STEPS else agent.done
 
             agent.save_experience(
                 experience=(

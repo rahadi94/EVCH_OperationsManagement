@@ -1101,11 +1101,17 @@ class Operator:
 
         t = self.env.now
 
-        generation_current_period = (
-            self.non_dispatchable_generator.generation_profile_actual.loc[t][
-                "pv_generation"
-            ]
-        )
+        # Check if the time index exists in the generation profile
+        if t in self.non_dispatchable_generator.generation_profile_actual.index:
+            generation_current_period = (
+                self.non_dispatchable_generator.generation_profile_actual.loc[t][
+                    "pv_generation"
+                ]
+            )
+        else:
+            # If time index doesn't exist, return 0 (no generation)
+            # This handles cases where simulation runs longer than available data
+            generation_current_period = 0.0
 
         return generation_current_period
 
@@ -1251,10 +1257,6 @@ class Operator:
                     request.energy_charged += (
                         request.charging_power / 60
                     )  # sim unit time is minutes so need to divide by 60
-                    request.calculate_profit_reward(
-                        self.charging_hub.penalty_for_missed_kWh,
-                        self.electricity_tariff,
-                    )
                     if request.charging_power < 0:
                         lg.warning(
                             f"charging power of {request.id} is negative{request.charging_power}"

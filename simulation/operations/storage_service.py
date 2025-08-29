@@ -94,7 +94,7 @@ class StorageService:
         mask = (
             False
             if self.op.storage_agent.episode_step_number_val
-            >= self.op.storage_agent.environment._max_episode_steps
+            >= self.op.storage_agent.environment.MAX_EPISODE_STEPS
             else self.op.storage_agent.done
         )
         # if not eval_ep:

@@ -49,6 +49,7 @@ def run_experiments():
     pricing_config.maximum_power = max_cap
     pricing_config.maximum_grid_usage = max_grid_usage
     pricing_config.number_power_options = len(Configuration.instance().energy_prices) + 0
+    
     pricing_config.environment = PricingEnv(config=pricing_config, DQN=False)
     pricing_config.learnt_network = evaluate_after_training
     pricing_config.evaluation_after_training = evaluate_after_training
