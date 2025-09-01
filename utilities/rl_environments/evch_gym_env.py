@@ -32,7 +32,7 @@ class EVCHConfig:
     dynamic_parking_fee: bool = False
     limiting_grid_capa: bool = False
     dynamic_storage_scheduling: bool = False
-    
+
 
 
 class EVCHGymEnv(gym.Env):

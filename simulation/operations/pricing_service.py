@@ -2,6 +2,8 @@ from typing import Any, Dict
 import pandas as pd
 from resources.configuration.configuration import Configuration
 from utilities.rl_environments.rl_pricing_env import convert_to_vector
+from .decision_request_system import DecisionType, decision_system
+from .decision_decorators import auto_register_agents
 
 
 class PricingService:
@@ -13,6 +15,9 @@ class PricingService:
     def __init__(self, operator: Any, agents_controller: Any | None = None):
         self.op = operator
         self.agents_controller = agents_controller
+        
+        # Register agents with the decision request system
+        auto_register_agents(operator)
 
     # Public APIs used by Operator
     def take_dynamic_pricing_actions(self) -> None:
@@ -67,7 +72,10 @@ class PricingService:
 
         if pricing_mode == "Discrete":
             if agent_name == "DQN":
-                self.op.pricing_agent.action = self.op.pricing_agent.pick_action()
+                # Use decision request system for DQN pricing
+                action = self._get_pricing_decision_via_request(eval_ep=False)
+                self.op.pricing_agent.action = action
+                
                 if len(self.op.price_pairs[:, 1]) > 1:
                     vector_prices = convert_to_vector(self.op.pricing_agent.action)
                 else:
@@ -77,7 +85,10 @@ class PricingService:
                     self.op.price_pairs[i, 1] = price
 
             elif agent_name == "SAC":
-                self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep)
+                # Use decision request system for SAC pricing
+                action = self._get_pricing_decision_via_request(eval_ep)
+                self.op.pricing_agent.action = action
+                
                 rescaled_actions = self.op.pricing_agent.environment.rescale_action(self.op.pricing_agent.action)
                 number_of_power_options = len(self.op.price_pairs[:, 1])
                 final_pricing = rescaled_actions[:number_of_power_options]
@@ -85,7 +96,10 @@ class PricingService:
                 self.op.price_pairs[1, 1] = min(final_pricing[1], 1.5)
 
         elif pricing_mode == "Continuous":
-            self.op.pricing_agent.action = self.op.pricing_agent.pick_action(eval_ep)
+            # Use decision request system for continuous pricing
+            action = self._get_pricing_decision_via_request(eval_ep)
+            self.op.pricing_agent.action = action
+            
             rescaled_actions = self.op.pricing_agent.environment.rescale_action(self.op.pricing_agent.action)
 
             config = Configuration.instance()
@@ -183,6 +197,45 @@ class PricingService:
             pricing_mode=self.op.pricing_mode,
             price_history=self.op.price_history,
         )
+
+    def _get_pricing_decision_via_request(self, eval_ep: bool = False) -> Any:
+        """
+        Get pricing decision through the decision request system.
+        
+        Args:
+            eval_ep: Whether this is an evaluation episode
+            
+        Returns:
+            The pricing action/decision
+        """
+        # Create context for the decision request
+        context = {
+            "eval_ep": eval_ep,
+            "pricing_mode": Configuration.instance().pricing_mode,
+            "agent_name": self.op.pricing_agent.agent_name,
+            "charging_hub": self.op.charging_hub,
+            "env": self.op.env
+        }
+        
+        # Create and process decision request
+        request_id = decision_system.create_request(
+            agent_type=DecisionType.PRICING,
+            state=self.op.pricing_agent.state,
+            context=context,
+            metadata={
+                "pricing_mode": context["pricing_mode"],
+                "agent_name": context["agent_name"]
+            }
+        )
+        
+        # Process the request
+        response = decision_system.process_request(request_id)
+        
+        if response:
+            return response.action
+        else:
+            # Fallback to direct agent call if request system fails
+            return self.op.pricing_agent.pick_action(eval_ep)
 
     # Internal helpers (ported from Operator)
     def _update_dynamic_price_history(self) -> None:

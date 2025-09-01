@@ -1,6 +1,8 @@
 from typing import List, Dict, Any, Optional
 from simulation.operations.agents_controller import AgentsController
 from simulation.config_facade import ConfigFacade
+from .decision_request_system import DecisionType, decision_system
+from .decision_decorators import auto_register_agents
 
 
 class StorageService:
@@ -23,6 +25,9 @@ class StorageService:
         self.op = operator_instance
         self.agents_controller = agents_controller
         self.config = config_facade or ConfigFacade()
+        
+        # Register agents with the decision request system
+        auto_register_agents(operator_instance)
     
     def take_storage_action(self) -> None:
         """
@@ -38,17 +43,9 @@ class StorageService:
             if action_result:
                 self.op.storage_agent.action = action_result.get("storage_action")
         else:
-            # Fallback to direct agent access (legacy behavior)
-            storage_state = self.op.charging_hub.storage_agent.environment.get_state(
-                self.op.charging_hub, self.op.env
-            )
-            self.op.storage_agent.state = storage_state
-
-            eval_ep = self.op.storage_agent.do_evaluation_iterations
-            self.op.storage_agent.episode_step_number_val = 0
-            self.op.storage_agent.action = self.op.storage_agent.pick_action(
-                eval_ep, self.op.charging_hub
-            )
+            # Use decision request system for storage decisions
+            action = self._get_storage_decision_via_request()
+            self.op.storage_agent.action = action
     
     def conduct_storage_action(self, given_storage_action: Optional[List[float]] = None) -> None:
         """
@@ -110,3 +107,53 @@ class StorageService:
         )
         self.op.storage_agent.global_step_number += 1
         self.op.storage_agent.step_counter += 1
+
+    def _get_storage_decision_via_request(self) -> Any:
+        """
+        Get storage decision through the decision request system.
+        
+        Returns:
+            The storage action/decision
+        """
+        # Get current state from environment
+        storage_state = self.op.charging_hub.storage_agent.environment.get_state(
+            self.op.charging_hub, self.op.env
+        )
+        self.op.storage_agent.state = storage_state
+
+        eval_ep = self.op.storage_agent.do_evaluation_iterations
+        self.op.storage_agent.episode_step_number_val = 0
+        
+        # Create context for the decision request
+        context = {
+            "eval_ep": eval_ep,
+            "charging_hub": self.op.charging_hub,
+            "env": self.op.env
+        }
+        
+        # Create and process decision request
+        request_id = decision_system.create_request(
+            agent_type=DecisionType.STORAGE,
+            state=self.op.storage_agent.state,
+            context=context,
+            metadata={
+                "agent_name": getattr(self.op.storage_agent, "agent_name", "Unknown")
+            }
+        )
+        
+        # Process the request
+        response = decision_system.process_request(request_id)
+        
+        if response:
+            return response.action
+        else:
+            # Fallback to direct agent call if request system fails
+            # Handle different pick_action signatures
+            import inspect
+            sig = inspect.signature(self.op.storage_agent.pick_action)
+            if len(sig.parameters) > 2:  # Method expects eval_ep and charging_hub parameters
+                return self.op.storage_agent.pick_action(eval_ep, self.op.charging_hub)
+            elif len(sig.parameters) > 1:  # Method expects only eval_ep parameter
+                return self.op.storage_agent.pick_action(eval_ep)
+            else:  # Method doesn't expect eval_ep parameter
+                return self.op.storage_agent.pick_action()
