@@ -3,7 +3,26 @@ import logging
 from resources.logging.simulation_context_filter import SimulationContextFilter
 
 lg = logging.getLogger()
-lg.setLevel(logging.ERROR)
+
+# Try to get log level from configuration, fallback to ERROR if not available
+try:
+    from resources.configuration.configuration import Configuration
+    config = Configuration.instance()
+    log_level_str = getattr(config, 'log_level', 'ERROR')
+    
+    # Convert string to logging level
+    log_level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    log_level = log_level_map.get(log_level_str.upper(), logging.ERROR)
+except:
+    log_level = logging.ERROR
+
+lg.setLevel(log_level)
 
 # Avoid adding duplicate handlers if this module is imported multiple times
 if not lg.handlers:
@@ -11,11 +30,11 @@ if not lg.handlers:
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] [Time %(env_time)10s] [%(clazz)30s %(oid)3s]: %(message)s')
     file_handler = logging.FileHandler("report.log")
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.ERROR)
+    file_handler.setLevel(log_level)
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
-    stream_handler.setLevel(logging.ERROR)
+    stream_handler.setLevel(log_level)
 
     lg.addHandler(file_handler)
     lg.addHandler(stream_handler)

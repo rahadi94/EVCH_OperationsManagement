@@ -203,72 +203,38 @@ uv pip install -r requirements.uv.txt
 
 ## 🚀 Quick Start
 
-### Basic Usage with Agent Decision System
+### Running the Simulation
 
-```python
-from simulation.operations.agent_decision_system import agent_decision_system
-from utilities.rl_agents.rule_based_agents import RuleBasedPricingAgent
-from utilities.rl_agents.algorithm_agents import AlgorithmChargingAgent
+The main entry point for the simulation is `main.py`. You can run it with different configuration files:
 
-# 1. Create agents
-pricing_agent = RuleBasedPricingAgent(strategy="time_of_use")
-charging_agent = AlgorithmChargingAgent(algorithm="first_come_first_served")
+```bash
+# Run with default configuration
+python main.py resources/configuration/ini_files/app-remote.ini
 
-# 2. Register agents
-agent_decision_system.register_agent(DecisionType.PRICING, pricing_agent)
-agent_decision_system.register_agent(DecisionType.CHARGING, charging_agent)
-
-# 3. Make decisions
-context = {"eval_ep": False, "charging_hub": hub, "env": env}
-pricing_decision = agent_decision_system.make_pricing_decision(context)
-charging_decision = agent_decision_system.make_charging_decision(vehicles, context)
-
-# 4. Apply decisions
-energy_price = pricing_decision.action["energy_price"]
-charging_actions = charging_decision.action["charging_actions"]
+# Run with custom configuration
+python main.py path/to/your/config.ini
 ```
 
-### RL Agent Integration
+### Configuration Files
 
-```python
-from stable_baselines3 import SAC
-from utilities.rl_environments.evch_gym_env import EVCHGymEnv, AgentType, EVCHConfig
-from utilities.rl_agents.factory import build_gym_agents_controller
+The simulation uses INI configuration files to set parameters for:
+- Environment settings (seasons, duration, facility size)
+- Infrastructure (chargers, grid capacity, storage, PV)
+- Agent types and strategies
+- Logging and monitoring options
 
-# 1. Create gym environment
-config = EVCHConfig(
-    agent_type=AgentType.PRICING,
-    number_chargers=10,
-    number_power_options=2,
-    maximum_power=800.0
-)
-env = EVCHGymEnv(config)
-
-# 2. Create and train RL agent
-agent = SAC("MlpPolicy", env, verbose=1)
-agent.learn(total_timesteps=10000)
-
-# 3. Integrate with simulation
-agents_controller = build_gym_agents_controller(
-    pricing_agent=agent,
-    pricing_config=config.__dict__
-)
-
-# 4. Use with operator
-operator = Operator(..., agents_controller=agents_controller)
-```
-
-### Configuration
-
-The system can be configured through the `app-remote.ini` file:
+### Example Configuration
 
 ```ini
 [AGENT_DECISION_SYSTEM]
 enabled = True
 pricing_agent_type = RULE_BASED
 charging_agent_type = HEURISTIC
-default_charging_algorithm = first_come_first_served
-enable_decision_tracking = True
+enable_hyperparameter_tuning = False
+
+[SETTINGS]
+log_level = INFO
+facility_size = 200
 ```
 
 ## 📚 Documentation

@@ -42,7 +42,7 @@ class Configuration:
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = False
-        self.evaluation_after_training = False
+        self.evaluation_after_training = True
         self.demand_threshold = 0
         self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
@@ -128,6 +128,7 @@ class Configuration:
             "grid_management": "RULE_BASED",    # Default grid management agent type
             "demand_forecasting": "RULE_BASED"  # Default demand forecasting agent type
         }
+
         self.agent_configuration_file = None  # Path to agent-specific configuration
         self.enable_decision_tracking = True   # Enable comprehensive decision tracking
         self.enable_performance_monitoring = True  # Enable agent performance monitoring
@@ -146,6 +147,21 @@ class Configuration:
         self.agent_confidence_threshold = 0.7      # Minimum confidence for agent decisions
         self.agent_timeout_seconds = 30.0          # Timeout for agent decisions
         self.agent_fallback_enabled = True         # Enable fallback to direct calls if agent fails
+        self.enable_hyperparameter_tuning = False
+        self.save_training_results = False         # Don't save results during training by default
+
+        # Agent Strategy Configuration (defaults)
+        # =====================================
+        self.default_strategies = {
+            "pricing": "time_of_use",              # Default pricing strategy
+            "charging": "first_come_first_served", # Default charging strategy
+            "storage": "peak_shaving",             # Default storage strategy
+            "routing": "lowest_occupancy_first",   # Default routing strategy
+            "vehicle_assignment": "nearest_available", # Default vehicle assignment strategy
+            "parking_allocation": "first_available",  # Default parking allocation strategy
+            "grid_management": "load_balancing",      # Default grid management strategy
+            "demand_forecasting": "historical_average" # Default demand forecasting strategy
+        }
 
         # from main file
         self.set_parameters_from_ini_file()
@@ -278,6 +294,9 @@ class Configuration:
         self.CACHE_PATH_WS = parser_main.get("SETTINGS", "caching_path")
         self.OUTPUT_DATA_PATH = parser_main.get("SETTINGS", "raw_output_save_path")
         self.OUTPUT_VIZ_PATH = parser_main.get("SETTINGS", "visuals_save_path")
+        
+        # Logging configuration
+        self.log_level = parser_main.get("SETTINGS", "log_level", fallback="ERROR")
 
         # self.TRAIN_WEEKS, self.TEST_WEEKS = sample_training_and_test_weeks(seed=None)
         self.SIM_SEASON = parser_main.get("ENVIRONMENT", "sim_season").split(",")
@@ -350,6 +369,8 @@ class Configuration:
             self.agent_confidence_threshold = parser_main.getfloat("AGENT_DECISION_SYSTEM", "confidence_threshold", fallback=0.7)
             self.agent_timeout_seconds = parser_main.getfloat("AGENT_DECISION_SYSTEM", "timeout_seconds", fallback=30.0)
             self.agent_fallback_enabled = parser_main.getboolean("AGENT_DECISION_SYSTEM", "fallback_enabled", fallback=True)
+            self.enable_hyperparameter_tuning = parser_main.getboolean("AGENT_DECISION_SYSTEM", "enable_hyperparameter_tuning", fallback=False)
+            self.save_training_results = parser_main.getboolean("AGENT_DECISION_SYSTEM", "save_training_results", fallback=False)
             
             # Read agent types for each decision type
             if parser_main.has_option("AGENT_DECISION_SYSTEM", "pricing_agent_type"):
@@ -368,6 +389,24 @@ class Configuration:
                 self.default_agent_types["grid_management"] = parser_main.get("AGENT_DECISION_SYSTEM", "grid_management_agent_type")
             if parser_main.has_option("AGENT_DECISION_SYSTEM", "demand_forecasting_agent_type"):
                 self.default_agent_types["demand_forecasting"] = parser_main.get("AGENT_DECISION_SYSTEM", "demand_forecasting_agent_type")
+            
+            # Read strategy parameters for each decision type
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "pricing_strategy"):
+                self.default_strategies["pricing"] = parser_main.get("AGENT_DECISION_SYSTEM", "pricing_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "charging_strategy"):
+                self.default_strategies["charging"] = parser_main.get("AGENT_DECISION_SYSTEM", "charging_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "storage_strategy"):
+                self.default_strategies["storage"] = parser_main.get("AGENT_DECISION_SYSTEM", "storage_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "routing_strategy"):
+                self.default_strategies["routing"] = parser_main.get("AGENT_DECISION_SYSTEM", "routing_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "vehicle_assignment_strategy"):
+                self.default_strategies["vehicle_assignment"] = parser_main.get("AGENT_DECISION_SYSTEM", "vehicle_assignment_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "parking_allocation_strategy"):
+                self.default_strategies["parking_allocation"] = parser_main.get("AGENT_DECISION_SYSTEM", "parking_allocation_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "grid_management_strategy"):
+                self.default_strategies["grid_management"] = parser_main.get("AGENT_DECISION_SYSTEM", "grid_management_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "demand_forecasting_strategy"):
+                self.default_strategies["demand_forecasting"] = parser_main.get("AGENT_DECISION_SYSTEM", "demand_forecasting_strategy")
             
             # Read default algorithms for algorithm agents
             if parser_main.has_option("AGENT_DECISION_SYSTEM", "default_charging_algorithm"):
