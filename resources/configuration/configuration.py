@@ -42,7 +42,7 @@ class Configuration:
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = False
-        self.evaluation_after_training = True
+        self.evaluation_after_training = False
         self.demand_threshold = 0
         self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
@@ -114,6 +114,53 @@ class Configuration:
         self.upper_base_parking_fee = 0.02
         self.lower_base_power = 0
         self.higher_base_power = 0
+
+        # Agent Decision System Configuration (defaults)
+        # =============================================
+        self.use_agent_decision_system = True  # Enable the new agent decision system
+        self.default_agent_types = {
+            "pricing": "RULE_BASED",      # Default pricing agent type
+            "charging": "HEURISTIC",      # Default charging agent type (algorithm wrapper)
+            "storage": "HEURISTIC",       # Default storage agent type (algorithm wrapper)
+            "routing": "HEURISTIC",       # Default routing agent type (algorithm wrapper)
+            "vehicle_assignment": "HEURISTIC",  # Default vehicle assignment agent type
+            "parking_allocation": "RULE_BASED", # Default parking allocation agent type
+            "grid_management": "RULE_BASED",    # Default grid management agent type
+            "demand_forecasting": "RULE_BASED"  # Default demand forecasting agent type
+        }
+
+        self.agent_configuration_file = None  # Path to agent-specific configuration
+        self.enable_decision_tracking = True   # Enable comprehensive decision tracking
+        self.enable_performance_monitoring = True  # Enable agent performance monitoring
+        
+        # Agent Algorithm Configuration (defaults)
+        # ======================================
+        # Default algorithms for algorithm agents (when agent_type = "HEURISTIC")
+        self.default_algorithms = {
+            "charging": "first_come_first_served",  # Default charging algorithm
+            "routing": "lowest_occupancy_first",    # Default routing algorithm
+            "storage": "peak_shaving"               # Default storage algorithm
+        }
+        
+        # Agent Performance Thresholds (defaults)
+        # =====================================
+        self.agent_confidence_threshold = 0.7      # Minimum confidence for agent decisions
+        self.agent_timeout_seconds = 30.0          # Timeout for agent decisions
+        self.agent_fallback_enabled = True         # Enable fallback to direct calls if agent fails
+        self.enable_hyperparameter_tuning = False
+        self.save_training_results = False         # Don't save results during training by default
+
+        # Agent Strategy Configuration (defaults)
+        self.default_strategies = {
+            "pricing": "time_of_use",
+            "charging": "first_come_first_served", 
+            "storage": "peak_shaving",
+            "routing": "lowest_occupancy_first",
+            "vehicle_assignment": "lowest_occupancy_first",  # Same as routing
+            "parking_allocation": "lowest_occupancy_first",  # Same as routing
+            "grid_management": "load_balancing",
+            "demand_forecasting": "historical_average"
+        }
 
         # from main file
         self.set_parameters_from_ini_file()
@@ -188,6 +235,51 @@ class Configuration:
         if peak_penalty == 'h':
             self.peak_cost = self.peak_cost * 3
 
+    def get_agent_configuration(self, decision_type: str) -> dict:
+        """
+        Get agent configuration for a specific decision type.
+        
+        Args:
+            decision_type: The type of decision (pricing, charging, storage, routing, etc.)
+            
+        Returns:
+            Dictionary containing agent configuration
+        """
+        if not self.use_agent_decision_system:
+            return {}
+            
+        agent_type = self.default_agent_types.get(decision_type.lower(), "RULE_BASED")
+        algorithm = self.default_algorithms.get(decision_type.lower(), None)
+        
+        config = {
+            "agent_type": agent_type,
+            "enabled": True,
+            "confidence_threshold": self.agent_confidence_threshold,
+            "timeout_seconds": self.agent_timeout_seconds,
+            "fallback_enabled": self.agent_fallback_enabled
+        }
+        
+        if algorithm:
+            config["algorithm"] = algorithm
+            
+        return config
+    
+    def get_all_agent_configurations(self) -> dict:
+        """
+        Get configuration for all agent types.
+        
+        Returns:
+            Dictionary containing configurations for all decision types
+        """
+        if not self.use_agent_decision_system:
+            return {}
+            
+        configs = {}
+        for decision_type in self.default_agent_types.keys():
+            configs[decision_type] = self.get_agent_configuration(decision_type)
+            
+        return configs
+
 
     def set_parameters_from_ini_file(self) -> None:
 
@@ -201,6 +293,9 @@ class Configuration:
         self.CACHE_PATH_WS = parser_main.get("SETTINGS", "caching_path")
         self.OUTPUT_DATA_PATH = parser_main.get("SETTINGS", "raw_output_save_path")
         self.OUTPUT_VIZ_PATH = parser_main.get("SETTINGS", "visuals_save_path")
+        
+        # Logging configuration
+        self.log_level = parser_main.get("SETTINGS", "log_level", fallback="ERROR")
 
         # self.TRAIN_WEEKS, self.TEST_WEEKS = sample_training_and_test_weeks(seed=None)
         self.SIM_SEASON = parser_main.get("ENVIRONMENT", "sim_season").split(",")
@@ -263,6 +358,66 @@ class Configuration:
         self.OPT_PERIOD_LENGTH = parser_main.getint("OPERATOR", "optimization_period_length")
         self.LOOKAHEAD = parser_main.getint("OPERATOR", "num_lookahead_planning_periods")
         self.LOOKBACK = 24 * 60
+
+        # Agent Decision System Configuration
+        # ===================================
+        if parser_main.has_section("AGENT_DECISION_SYSTEM"):
+            self.use_agent_decision_system = parser_main.getboolean("AGENT_DECISION_SYSTEM", "enabled", fallback=True)
+            self.enable_decision_tracking = parser_main.getboolean("AGENT_DECISION_SYSTEM", "enable_decision_tracking", fallback=True)
+            self.enable_performance_monitoring = parser_main.getboolean("AGENT_DECISION_SYSTEM", "enable_performance_monitoring", fallback=True)
+            self.agent_confidence_threshold = parser_main.getfloat("AGENT_DECISION_SYSTEM", "confidence_threshold", fallback=0.7)
+            self.agent_timeout_seconds = parser_main.getfloat("AGENT_DECISION_SYSTEM", "timeout_seconds", fallback=30.0)
+            self.agent_fallback_enabled = parser_main.getboolean("AGENT_DECISION_SYSTEM", "fallback_enabled", fallback=True)
+            self.enable_hyperparameter_tuning = parser_main.getboolean("AGENT_DECISION_SYSTEM", "enable_hyperparameter_tuning", fallback=False)
+            self.save_training_results = parser_main.getboolean("AGENT_DECISION_SYSTEM", "save_training_results", fallback=False)
+            
+            # Read agent types for each decision type
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "pricing_agent_type"):
+                self.default_agent_types["pricing"] = parser_main.get("AGENT_DECISION_SYSTEM", "pricing_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "charging_agent_type"):
+                self.default_agent_types["charging"] = parser_main.get("AGENT_DECISION_SYSTEM", "charging_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "storage_agent_type"):
+                self.default_agent_types["storage"] = parser_main.get("AGENT_DECISION_SYSTEM", "storage_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "routing_agent_type"):
+                self.default_agent_types["routing"] = parser_main.get("AGENT_DECISION_SYSTEM", "routing_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "vehicle_assignment_agent_type"):
+                self.default_agent_types["vehicle_assignment"] = parser_main.get("AGENT_DECISION_SYSTEM", "vehicle_assignment_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "parking_allocation_agent_type"):
+                self.default_agent_types["parking_allocation"] = parser_main.get("AGENT_DECISION_SYSTEM", "parking_allocation_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "grid_management_agent_type"):
+                self.default_agent_types["grid_management"] = parser_main.get("AGENT_DECISION_SYSTEM", "grid_management_agent_type")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "demand_forecasting_agent_type"):
+                self.default_agent_types["demand_forecasting"] = parser_main.get("AGENT_DECISION_SYSTEM", "demand_forecasting_agent_type")
+            
+            # Read strategy parameters for each decision type
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "pricing_strategy"):
+                self.default_strategies["pricing"] = parser_main.get("AGENT_DECISION_SYSTEM", "pricing_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "charging_strategy"):
+                self.default_strategies["charging"] = parser_main.get("AGENT_DECISION_SYSTEM", "charging_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "storage_strategy"):
+                self.default_strategies["storage"] = parser_main.get("AGENT_DECISION_SYSTEM", "storage_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "routing_strategy"):
+                self.default_strategies["routing"] = parser_main.get("AGENT_DECISION_SYSTEM", "routing_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "vehicle_assignment_strategy"):
+                self.default_strategies["vehicle_assignment"] = parser_main.get("AGENT_DECISION_SYSTEM", "vehicle_assignment_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "parking_allocation_strategy"):
+                self.default_strategies["parking_allocation"] = parser_main.get("AGENT_DECISION_SYSTEM", "parking_allocation_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "grid_management_strategy"):
+                self.default_strategies["grid_management"] = parser_main.get("AGENT_DECISION_SYSTEM", "grid_management_strategy")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "demand_forecasting_strategy"):
+                self.default_strategies["demand_forecasting"] = parser_main.get("AGENT_DECISION_SYSTEM", "demand_forecasting_strategy")
+            
+            # Read default algorithms for algorithm agents
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "default_charging_algorithm"):
+                self.default_algorithms["charging"] = parser_main.get("AGENT_DECISION_SYSTEM", "default_charging_algorithm")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "default_routing_algorithm"):
+                self.default_algorithms["routing"] = parser_main.get("AGENT_DECISION_SYSTEM", "default_routing_algorithm")
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "default_storage_algorithm"):
+                self.default_algorithms["storage"] = parser_main.get("AGENT_DECISION_SYSTEM", "default_storage_algorithm")
+            
+            # Read agent configuration file path if specified
+            if parser_main.has_option("AGENT_DECISION_SYSTEM", "agent_configuration_file"):
+                self.agent_configuration_file = parser_main.get("AGENT_DECISION_SYSTEM", "agent_configuration_file")
 
         self.MAINTENANCE_COST = parser_main.getfloat("CAPEX", "maintenance_cost")
         self.ELECTRICITY_TARIFF = parser_main.get("OPEX", "hourly_energy_costs").split(",")

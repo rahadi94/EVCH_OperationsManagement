@@ -24,6 +24,8 @@ __pycache__/
 /Results/raw_output/
 /Cache/
 /new_notebooks_EVCH/
+/examples/
+/docs/
 
 # Root level data files
 chargingdata.csv

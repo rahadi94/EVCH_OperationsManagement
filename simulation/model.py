@@ -583,7 +583,7 @@ class EVCC_Sim_Model:
         self.costs = dict(investment=0, operations=0)
         self.objective_function = 0
         self.total_energy_charged = 0
-        self.reward = dict(costs=0, missed=0, feasibility=0, feasibility_storage=0)
+        self.reward = dict(costs=0, profit=0, feasibility=0, feasibility_storage=0)
         
         # Create operator
         self.operator = Operator(
@@ -628,27 +628,54 @@ class EVCC_Sim_Model:
         
         # Setup charging agent
         if self.charging_agent:
-            self.charging_agent.environment.state = (
-                self.charging_agent.environment.get_state(self, self.env)
-            )
-            self.charging_agent.environment.env = self.env
-            self.charging_agent.reset_game()
+            # Check if agent has environment (RL agents) or not (rule-based/algorithm agents)
+            if hasattr(self.charging_agent, 'environment'):
+                # Set charging_hub and env in the environment for RL agents
+                self.charging_agent.environment.charging_hub = self
+                self.charging_agent.environment.env = self.env
+                self.charging_agent.environment.state = (
+                    self.charging_agent.environment.get_state(self, self.env)
+                )
+                self.charging_agent.reset_game()
+            else:
+                # For rule-based/algorithm agents, just store the charging hub reference
+                if hasattr(self.charging_agent, 'set_charging_hub'):
+                    self.charging_agent.set_charging_hub(self)
+                print(f"Initialized charging agent: {self.charging_agent.__class__.__name__}")
         
         # Setup pricing agent
         if self.pricing_agent:
-            self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
-                self, self.env
-            )
-            self.pricing_agent.environment.env = self.env
-            self.pricing_agent.reset_game()
+            # Check if agent has environment (RL agents) or not (rule-based/algorithm agents)
+            if hasattr(self.pricing_agent, 'environment'):
+                # Set charging_hub and env in the environment for RL agents
+                self.pricing_agent.environment.charging_hub = self
+                self.pricing_agent.environment.env = self.env
+                self.pricing_agent.environment.state = self.pricing_agent.environment.get_state(
+                    self, self.env
+                )
+                self.pricing_agent.reset_game()
+            else:
+                # For rule-based/algorithm agents, just store the charging hub reference
+                if hasattr(self.pricing_agent, 'set_charging_hub'):
+                    self.pricing_agent.set_charging_hub(self)
+                print(f"Initialized pricing agent: {self.pricing_agent.__class__.__name__}")
         
         # Setup storage agent
         if self.storage_agent:
-            self.storage_agent.environment.state = (
-                self.storage_agent.environment.get_state(self, self.env)
-            )
-            self.storage_agent.environment.env = self.env
-            self.storage_agent.reset_game()
+            # Check if agent has environment (RL agents) or not (rule-based/algorithm agents)
+            if hasattr(self.storage_agent, 'environment'):
+                # Set charging_hub and env in the environment for RL agents
+                self.storage_agent.environment.charging_hub = self
+                self.storage_agent.environment.env = self.env
+                self.storage_agent.environment.state = (
+                    self.storage_agent.environment.get_state(self, self.env)
+                )
+                self.storage_agent.reset_game()
+            else:
+                # For rule-based/algorithm agents, just store the charging hub reference
+                if hasattr(self.storage_agent, 'set_charging_hub'):
+                    self.storage_agent.set_charging_hub(self)
+                print(f"Initialized storage agent: {self.storage_agent.__class__.__name__}")
         
         # Link agents to operator
         self.operator.charging_agent = charging_agent

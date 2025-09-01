@@ -256,11 +256,9 @@ class Base_Agent(object):
         # if self.config.save_model: self.locally_save_policy()
         return self.game_full_episode_scores, self.rolling_results, time_taken
 
-    def conduct_action(self, action, charging_hub, env):
+    def conduct_action(self, action):
         """Conducts an action in the environment"""
-        self.next_state, self.reward, self.done, _ = self.environment.step(
-            action, charging_hub, env
-        )
+        self.next_state, self.reward, self.done, _ = self.environment.step(action)
         self.total_episode_score_so_far += self.reward
         if self.hyperparameters["clip_rewards"]:
             self.reward = max(min(self.reward, 1.0), -1.0)

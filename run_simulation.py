@@ -248,29 +248,33 @@ def run_single_simulation(
             plot_time = round((plot_end_time - save_end_time) / 60, 2)
             print("Results Plotted (in {} minutes)".format(plot_time))
     if model.charging_agent:
-        model.charging_agent.save_models()
+        if hasattr(model.charging_agent, 'save_models'):
+            model.charging_agent.save_models()
     if model.pricing_agent:
-        model.pricing_agent.save_models()
+        if hasattr(model.pricing_agent, 'save_models'):
+            model.pricing_agent.save_models()
     # model.storage_agent.save_models()
-    if model.charging_agent:
+    if model.charging_agent and hasattr(model.charging_agent, 'environment'):
         lg.error(
             f"profit = {model.charging_agent.environment.total_reward['missed']},"
             f" energy = {model.charging_agent.environment.total_reward['energy']} ,feasibility "
             f"= {model.charging_agent.environment.total_reward['feasibility']}, feasibility_storage "
             f"= {model.charging_agent.environment.total_reward['feasibility_storage']}, pricing "
-            f"= {model.pricing_agent.environment.total_reward['missed']}"
+            f"= {model.pricing_agent.environment.total_reward['missed'] if hasattr(model.pricing_agent, 'environment') else 'N/A'}"
         )
-    if model.pricing_agent:
-        lg.error(f"profit ={model.pricing_agent.environment.total_reward['missed']}")
-    if model.charging_agent:
+    if model.pricing_agent and hasattr(model.pricing_agent, 'environment'):
+        lg.error(f"profit ={model.pricing_agent.environment.total_reward['profit']}")
+    if model.charging_agent and hasattr(model.charging_agent, 'environment'):
         model.charging_agent.environment.total_reward["missed"] = 0
         model.charging_agent.environment.total_reward["feasibility"] = 0
         model.charging_agent.environment.total_reward["feasibility_storage"] = 0
         model.charging_agent.environment.total_reward["energy"] = 0
-    if model.pricing_agent:
-        model.pricing_agent.environment.total_reward["missed"] = 0
-        model.pricing_agent._critic_loss = 0
-        model.pricing_agent._policy_loss = 0
+    if model.pricing_agent and hasattr(model.pricing_agent, 'environment'):
+        model.pricing_agent.environment.total_reward["profit"] = 0
+        if hasattr(model.pricing_agent, '_critic_loss'):
+            model.pricing_agent._critic_loss = 0
+        if hasattr(model.pricing_agent, '_policy_loss'):
+            model.pricing_agent._policy_loss = 0
     # model.storage_agent.environment.total_reward['test'] = 0
     output = pd.DataFrame(
         [
