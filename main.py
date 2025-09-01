@@ -113,6 +113,12 @@ def run_experiments():
         print("\nNo learnable agents detected. Running single simulation...")
         
         # Run single simulation with non-learnable agents
+        # Use a default start day if not specified
+        default_start_day = "2019-05-20"  # Default Monday in May 2019
+        
+        # Prepare results parameters for single simulation
+        results_params = [f"{getattr(config, 'POST_FIX', 'sim')}", f"state{9}", f"week{1}"]
+        
         run_single_simulation(
             charging_agent=agents.get("charging"),
             storage_agent=agents.get("storage"),
@@ -120,13 +126,13 @@ def run_experiments():
             num_charger={"fast_one": config.facility_size, "fast_two": 0, "fast_four": 0, 
                         "slow_one": 0, "slow_two": 0, "slow_four": 0},
             turn_off_monitoring=False,
-            turn_on_results=True,
+            turn_on_results=results_params,  # Pass list instead of boolean
             turn_on_plotting=True,
             transformer_num=config.TRANSFORMER_NUM,
             storage_capa=config.STORAGE_SIZE,
             pv_capa=config.PV_INSTALLED_CAPA,
             year=9,
-            start_day=config.SIM_START_DAY if hasattr(config, 'SIM_START_DAY') else None
+            start_day=default_start_day
         )
     
     print("Simulation completed successfully!")

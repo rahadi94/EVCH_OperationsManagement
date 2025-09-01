@@ -42,7 +42,7 @@ class Configuration:
         # if self.benchmarking:
         #     self.peak_cost = 0
         self.remove_low_request_EVs = False
-        self.evaluation_after_training = True
+        self.evaluation_after_training = False
         self.demand_threshold = 0
         self.duration_threshold = 1000000
         self.request_adjusting_mode = "Continuous"  #'Discrete, Continuous'
@@ -151,16 +151,15 @@ class Configuration:
         self.save_training_results = False         # Don't save results during training by default
 
         # Agent Strategy Configuration (defaults)
-        # =====================================
         self.default_strategies = {
-            "pricing": "time_of_use",              # Default pricing strategy
-            "charging": "first_come_first_served", # Default charging strategy
-            "storage": "peak_shaving",             # Default storage strategy
-            "routing": "lowest_occupancy_first",   # Default routing strategy
-            "vehicle_assignment": "nearest_available", # Default vehicle assignment strategy
-            "parking_allocation": "first_available",  # Default parking allocation strategy
-            "grid_management": "load_balancing",      # Default grid management strategy
-            "demand_forecasting": "historical_average" # Default demand forecasting strategy
+            "pricing": "time_of_use",
+            "charging": "first_come_first_served", 
+            "storage": "peak_shaving",
+            "routing": "lowest_occupancy_first",
+            "vehicle_assignment": "lowest_occupancy_first",  # Same as routing
+            "parking_allocation": "lowest_occupancy_first",  # Same as routing
+            "grid_management": "load_balancing",
+            "demand_forecasting": "historical_average"
         }
 
         # from main file
