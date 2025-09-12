@@ -540,4 +540,5 @@ class RLAgentConfig:
     def action_number(self):
         return self._action_number
 
-config = Configuration.instance()
+# Configuration instance will be created when needed
+# config = Configuration.instance()

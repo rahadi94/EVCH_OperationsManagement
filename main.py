@@ -108,6 +108,12 @@ def run_experiments(config: Configuration = None):
         config.dynamic_pricing = True
         print(f"Enabled dynamic pricing for learnable agent: {agent_config['pricing']['agent_type']}")
     
+    # Enable dynamic charging if using learnable charging agents
+    if (agent_config["charging"]["agent_type"] and 
+        is_agent_learnable(agent_config["charging"]["agent_type"])):
+        config.dynamic_charging = True
+        print(f"Enabled dynamic charging for learnable agent: {agent_config['charging']['agent_type']}")
+    
     # Run experiments based on agent types
     if learnable_agents:
         print(f"\nFound {len(learnable_agents)} learnable agents. Running training...")

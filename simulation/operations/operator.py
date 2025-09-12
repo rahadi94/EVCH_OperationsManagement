@@ -749,15 +749,16 @@ class Operator:
 
     def _update_peak_threshold(self) -> None:
         """Update peak threshold based on current grid usage."""
-        current_peak = max(self.charging_hub.grid.grid_usage)
-        if current_peak > self.peak_threshold:
-            self.peak_threshold = current_peak
+        if self.charging_hub.grid.grid_usage:
+            current_peak = max(self.charging_hub.grid.grid_usage)
+            if current_peak > self.peak_threshold:
+                self.peak_threshold = current_peak
     def take_learning_charging_actions(self, charging_strategy):
-        if charging_strategy == "dynamic":
+        if self.charging_hub.dynamic_charging:
             self.charging_service.take_learning_charging_actions(charging_strategy)
 
     def update_learning_charging_and_pricing_agents(self, charging_strategy):
-        if charging_strategy == "dynamic":
+        if self.charging_hub.dynamic_charging:
             self.charging_service.update_learning_charging_agent(charging_strategy)
             if self.storage_agent:
                 self.storage_service.update_storage_agent()
@@ -1324,11 +1325,10 @@ class Operator:
     def reward_computing(self):
         reward = 0
 
-        if max(self.charging_hub.grid.grid_usage) > self.peak_threshold:
-            reward += (
-                max(self.charging_hub.grid.grid_usage) - self.peak_threshold
-            ) * self.peak_cost
-            self.peak_threshold = max(self.charging_hub.grid.grid_usage)
+        if self.charging_hub.grid.grid_usage and max(self.charging_hub.grid.grid_usage) > self.peak_threshold:
+            current_peak = max(self.charging_hub.grid.grid_usage)
+            reward += (current_peak - self.peak_threshold) * self.peak_cost
+            self.peak_threshold = current_peak
         new_objective = self.charging_hub.update_objective_function(self.peak_threshold)
         reward -= new_objective - self.objective
         self.objective = new_objective

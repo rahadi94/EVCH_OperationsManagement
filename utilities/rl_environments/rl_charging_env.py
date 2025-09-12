@@ -5,7 +5,7 @@ import logging
 import pandas as pd
 
 
-class ChargingHubInvestmentEnv(gym.Env):
+class ChargingEnv(gym.Env):
     metadata = {"render.modes": ["human"]}
     reward_range = (-float("inf"), float("inf"))
     spec = None
@@ -235,10 +235,11 @@ class ChargingHubInvestmentEnv(gym.Env):
             lower_bound = i + 1
             for j in range(charger.number_of_connectors):
                 maximum_power = charger.power
-                if vehicle_state[i * 3] <= 0:
-                    action[i + 1] = 0
+                if i * 3 < len(vehicle_state) and vehicle_state[i * 3] <= 0:
+                    if i + 1 < len(action):
+                        action[i + 1] = 0
                 i += 1
-            upper_bound = i + 1
+            upper_bound = min(i + 1, len(action))
 
             while action[lower_bound:upper_bound].sum() > maximum_power:
                 number_active_chargers = len(

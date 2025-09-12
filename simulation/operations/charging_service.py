@@ -36,7 +36,7 @@ class ChargingService:
         Args:
             charging_strategy: The charging strategy to use
         """
-        if charging_strategy == "dynamic":
+        if self.op.charging_hub.dynamic_charging:
             self.op.update_vehicles_status()
             self.take_charging_action()
             self.conduct_charging_action()
@@ -55,27 +55,35 @@ class ChargingService:
         Args:
             charging_strategy: The charging strategy to use
         """
-        if charging_strategy == "dynamic":
+        if self.op.charging_hub.dynamic_charging:
             self.update_charging_agent()
     
     def take_charging_action(self) -> None:
         """
         Take charging action using the RL charging agent.
         """
-        if self.agents_controller and self.agents_controller.charging:
-            # Use the controller to get charging action
-            context = {
-                "charging_hub": self.op.charging_hub,
-                "env": self.op.env
-            }
-            action_result = self.agents_controller.charging_step(
-                vehicles=self.op.requests, 
-                context=context
-            )
-            if action_result:
-                self.op.charging_agent.action = action_result.get("charging_action")
+        if not self.op.charging_agent:
+            return
+            
+        # Check if this is an RL agent with environment or a rule-based/algorithm agent
+        if hasattr(self.op.charging_agent, 'environment'):
+            # RL agent with environment - use direct RL agent logic
+            charging_state = self.op.charging_agent.environment.get_state(self.op.charging_hub, self.op.env)
+            self.op.charging_agent.state = charging_state
+            eval_ep = self.op.charging_agent.do_evaluation_iterations
+
+            # Handle different pick_action signatures
+            import inspect
+            sig = inspect.signature(self.op.charging_agent.pick_action)
+            if len(sig.parameters) > 1:  # Method expects eval_ep parameter
+                action = self.op.charging_agent.pick_action(eval_ep)
+            else:  # Method doesn't expect eval_ep parameter
+                action = self.op.charging_agent.pick_action()
+                
+            self.op.charging_agent.action = action
+            
         else:
-            # Use decision request system for charging decisions
+            # Rule-based/algorithm agent - use decision request system
             action = self._get_charging_decision_via_request()
             self.op.charging_agent.action = action
     
@@ -84,60 +92,112 @@ class ChargingService:
         Execute the charging action by applying it to vehicles and chargers.
         """
         action = self.op.charging_agent.action
-        action_index = 1  # Start from 1 because action[0] is reserved (possibly for pricing or metadata)
+        
+        # Check if this is an RL agent with environment
+        if hasattr(self.op.charging_agent, 'environment'):
+            # For RL agents, rescale the action from normalized range to actual power values
+            if hasattr(self.op.charging_agent, 'rescale_action'):
+                action = self.op.charging_agent.rescale_action(action)
+            
+            # For RL agents, use the environment's checked_action method to ensure feasibility
+            if hasattr(self.op.charging_agent.environment, 'checked_action'):
+                action = self.op.charging_agent.environment.checked_action(action)
+            
+            # Apply storage action (action[0])
+            if len(action) > 0:
+                storage_power = action[0]
+                if storage_power >= 0:
+                    self.op.charging_hub.electric_storage.charge_yn = 1
+                    self.op.charging_hub.electric_storage.charging_power = storage_power
+                elif storage_power < 0:
+                    self.op.charging_hub.electric_storage.discharge_yn = 1
+                    self.op.charging_hub.electric_storage.discharging_power = -storage_power
+            
+            # Apply charging actions (action[1:])
+            action_index = 1  # Start from 1 because action[0] is for storage
+            for charger in self.op.charging_hub.chargers:
+                for connector_idx in range(charger.number_of_connectors):
+                    if action_index >= len(action):
+                        break  # Prevent index error if action list is shorter than expected
 
-        for charger in self.op.charging_hub.chargers:
-            for connector_idx in range(charger.number_of_connectors):
-                if action_index >= len(action):
-                    break  # Prevent index error if action list is shorter than expected
+                    charging_power = action[action_index]
+                    if charging_power > 0:
+                        charging_vehicles = charger.charging_vehicles
+                        if connector_idx < len(charging_vehicles):
+                            vehicle = charging_vehicles[connector_idx]
+                            vehicle.charging_power = charging_power
+                    action_index += 1
+        else:
+            # For non-RL agents, use the original logic
+            action_index = 1  # Start from 1 because action[0] is reserved
+            for charger in self.op.charging_hub.chargers:
+                for connector_idx in range(charger.number_of_connectors):
+                    if action_index >= len(action):
+                        break
 
-                charging_power = action[action_index]
-                if charging_power > 0:
-                    charging_vehicles = charger.charging_vehicles
-                    if connector_idx < len(charging_vehicles):
-                        vehicle = charging_vehicles[connector_idx]
-                        vehicle.charging_power = charging_power
-                action_index += 1
+                    charging_power = action[action_index]
+                    if charging_power > 0:
+                        charging_vehicles = charger.charging_vehicles
+                        if connector_idx < len(charging_vehicles):
+                            vehicle = charging_vehicles[connector_idx]
+                            vehicle.charging_power = charging_power
+                    action_index += 1
 
-        self.op.check_charging_power()
+        self.op.charging_hub.reward["profit"] = self.op.reward_computing()
         self.op.charging_hub.grid.reset_reward()
     
     def update_charging_agent(self) -> None:
         """
         Update the charging agent with new state and experience.
         """
-        self.op.update_vehicles_status()
-        self.op.charging_hub.reward["missed"] = self.op.reward_computing()
+        if not self.op.charging_agent:
+            return
+            
+        # Check if this is an RL agent with environment
+        if hasattr(self.op.charging_agent, 'environment'):
+            # Initialize episode step number if not already set
+            if not hasattr(self.op.charging_agent, 'episode_step_number_val'):
+                self.op.charging_agent.episode_step_number_val = 0
+            
+            # RL agent update logic
+            self.op.update_vehicles_status()
+            self.op.charging_hub.reward["missed"] = self.op.reward_computing()
 
-        eval_ep = self.op.charging_agent.do_evaluation_iterations
-        self.op.charging_agent.conduct_action(self.op.charging_agent.action)
-        if self.op.charging_agent.time_for_critic_and_actor_to_learn():
-            if not eval_ep:
-                for _ in range(
-                    self.op.charging_agent.hyperparameters[
-                        "learning_updates_per_learning_session"
-                    ]
-                ):
-                    self.op.charging_agent.learn()
-        mask = (
-            False
-            if self.op.charging_agent.episode_step_number_val
-            >= self.op.charging_agent.environment.MAX_EPISODE_STEPS
-            else self.op.charging_agent.done
-        )
-        # if not eval_ep:
-        action = self.op.charging_agent.descale_action(self.op.charging_agent.action)
-        self.op.charging_agent.save_experience(
-            experience=(
-                self.op.charging_agent.state,
-                action,
-                self.op.charging_agent.reward,
-                self.op.charging_agent.next_state,
-                mask,
+            eval_ep = self.op.charging_agent.do_evaluation_iterations
+            self.op.charging_agent.conduct_action(self.op.charging_agent.action)
+            if self.op.charging_agent.time_for_critic_and_actor_to_learn():
+                if not eval_ep:
+                    for _ in range(
+                        self.op.charging_agent.hyperparameters[
+                            "learning_updates_per_learning_session"
+                        ]
+                    ):
+                        self.op.charging_agent.learn()
+            mask = (
+                False
+                if self.op.charging_agent.episode_step_number_val
+                >= self.op.charging_agent.environment._max_episode_steps
+                else self.op.charging_agent.done
             )
-        )
-        self.op.charging_agent.global_step_number += 1
-        self.op.charging_agent.step_counter += 1
+            # if not eval_ep:
+            action = self.op.charging_agent.descale_action(self.op.charging_agent.action)
+            self.op.charging_agent.save_experience(
+                experience=(
+                    self.op.charging_agent.state,
+                    action,
+                    self.op.charging_agent.reward,
+                    self.op.charging_agent.next_state,
+                    mask,
+                )
+            )
+            self.op.charging_agent.global_step_number += 1
+            self.op.charging_agent.step_counter += 1
+        else:
+            # Non-RL agent update (minimal)
+            if hasattr(self.op.charging_agent, 'agent_name'):
+                print(f"Updated {self.op.charging_agent.__class__.__name__} (no learning required)")
+            else:
+                print(f"Updated {self.op.charging_agent.__class__.__name__} (no learning required)")
 
     def _get_charging_decision_via_request(self) -> Any:
         """

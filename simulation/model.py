@@ -539,6 +539,7 @@ class EVCC_Sim_Model:
         self.data_source = config.data_source
         self.benchmarking = config.benchmarking
         self.dynamic_pricing = config.dynamic_pricing
+        self.dynamic_charging = getattr(config, 'dynamic_charging', False)
         self.peak_threshold = config.peak_threshold
 
     def _init_infrastructure_and_data(self) -> None:

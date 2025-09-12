@@ -97,6 +97,7 @@ class ConfigFacade:
             price_parameters=self.get('price_parameters', []),
             pricing_mode=self.get('pricing_mode', 'static'),
             dynamic_pricing=self.get('dynamic_pricing', False),
+            dynamic_charging=self.get('dynamic_charging', False),
             dynamic_fix_term_pricing=self.get('dynamic_fix_term_pricing', False)
         )
     

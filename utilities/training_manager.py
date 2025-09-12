@@ -112,10 +112,15 @@ def run_standard_training(agent, decision_type: str, config: Configuration, retu
             if is_evaluation_episode:
                 results_params = [f"{getattr(config, 'POST_FIX', 'sim')}", f"state{9}", f"week{episode}"]
             
+            # Pass the correct agent based on decision type
+            charging_agent = agent if decision_type == "charging" else None
+            storage_agent = agent if decision_type == "storage" else None
+            pricing_agent = agent if decision_type == "pricing" else None
+            
             df = run_single_simulation(
-                charging_agent=None,  # Will be set by the simulation
-                storage_agent=None,   # Will be set by the simulation
-                pricing_agent=agent,
+                charging_agent=charging_agent,
+                storage_agent=storage_agent,
+                pricing_agent=pricing_agent,
                 num_charger=chargers,
                 turn_off_monitoring=False,
                 turn_on_results=results_params,  # Only save results during evaluation
