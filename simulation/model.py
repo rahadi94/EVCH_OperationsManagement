@@ -289,6 +289,7 @@ class EVCC_Sim_Model:
         storage_agent: Optional[Any] = None,
         pricing_agent: Optional[Any] = None,
         chargers_type: str = "single",
+        config: Optional[Any] = None,
     ):
         """
         Initialize the EVCC simulation model.
@@ -342,6 +343,9 @@ class EVCC_Sim_Model:
         """
         # Set singleton instance
         EVCC_Sim_Model.__instance = self
+        
+        # Store configuration
+        self.config = config
         
         # Initialize configuration objects
         self._init_simulation_config(
@@ -610,6 +614,7 @@ class EVCC_Sim_Model:
             service_level=self.service_level,
             charging_hub=self,
             minimum_served_demand=self.minimum_served_demand,
+            config=getattr(self, 'config', None),
         )
         
         # Initialize agents

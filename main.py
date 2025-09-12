@@ -10,7 +10,7 @@ from utilities.training_manager import run_learnable_agent_training
 from resources.logging.log import lg
 
 
-def run_experiments():
+def run_experiments(config: Configuration = None):
     """
     Main experiment runner that orchestrates the simulation.
     
@@ -18,8 +18,12 @@ def run_experiments():
     1. Creates and configures agents based on configuration
     2. Registers agents with the decision system
     3. Runs training for learnable agents or single simulation for non-learnable agents
+    
+    Args:
+        config: Configuration instance. If None, will create one from command line args.
     """
-    config = Configuration.instance()
+    if config is None:
+        config = Configuration.instance()
     
     print("Starting EVCC simulation with agent decision system...")
     
@@ -35,6 +39,7 @@ def run_experiments():
         pricing_agent = create_agent(
             "pricing", 
             agent_config["pricing"]["agent_type"], 
+            config=config,
             strategy=agent_config["pricing"]["strategy"]
         )
         agents["pricing"] = pricing_agent
@@ -51,6 +56,7 @@ def run_experiments():
         charging_agent = create_agent(
             "charging", 
             agent_config["charging"]["agent_type"], 
+            config=config,
             algorithm=agent_config["charging"]["algorithm"],
             strategy=agent_config["charging"]["strategy"]
         )
@@ -67,6 +73,7 @@ def run_experiments():
         storage_agent = create_agent(
             "storage", 
             agent_config["storage"]["agent_type"], 
+            config=config,
             algorithm=agent_config["storage"]["algorithm"],
             strategy=agent_config["storage"]["strategy"]
         )
@@ -83,6 +90,7 @@ def run_experiments():
         routing_agent = create_agent(
             "routing", 
             agent_config["routing"]["agent_type"], 
+            config=config,
             algorithm=agent_config["routing"]["algorithm"],
             strategy=agent_config["routing"]["strategy"]
         )
@@ -132,7 +140,8 @@ def run_experiments():
             storage_capa=config.STORAGE_SIZE,
             pv_capa=config.PV_INSTALLED_CAPA,
             year=9,
-            start_day=default_start_day
+            start_day=default_start_day,
+            config=config
         )
     
     print("Simulation completed successfully!")

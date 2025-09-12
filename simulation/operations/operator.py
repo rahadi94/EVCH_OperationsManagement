@@ -83,6 +83,7 @@ class Operator:
         charging_hub: Any,
         minimum_served_demand: float,
         agents_controller: Optional[Any] = None,
+        config: Optional[Any] = None,
     ):
         """
         Initialize the Operator with simulation parameters and strategies.
@@ -112,6 +113,9 @@ class Operator:
             charging_hub: Charging hub object
             minimum_served_demand: Minimum demand to serve
         """
+        # Store configuration
+        self.config = config
+        
         self._init_simulation_environment(env, sim_time)
         self._init_planning_parameters(
             num_lookback_periods, 
@@ -136,7 +140,7 @@ class Operator:
         # Optional RL agents controller (pricing/charging/storage)
         self.agents_controller = agents_controller
         # Service composition for RL agents
-        self.pricing_service = PricingService(operator=self, agents_controller=self.agents_controller)
+        self.pricing_service = PricingService(operator=self, agents_controller=self.agents_controller, config=getattr(self, 'config', None))
         self.charging_service = ChargingService(operator_instance=self, agents_controller=self.agents_controller)
         self.storage_service = StorageService(operator_instance=self, agents_controller=self.agents_controller)
         

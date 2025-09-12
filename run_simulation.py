@@ -126,6 +126,7 @@ def run_single_simulation(
     turn_on_plotting=False,
     turn_off_monitoring=False,
     start_day=SIM_START_DAY,
+    config=None,
 ):
     env = simpy.Environment()  # Creating the simpy environment
     # Inject simulation Environment to Logger (such that we can log the env time)
@@ -205,6 +206,7 @@ def run_single_simulation(
         charging_agent=charging_agent,
         storage_agent=storage_agent,
         pricing_agent=pricing_agent,
+        config=config,
     )
     # TODO: we have "planning" here again, maybe rename? Maybe planning phase?
     # run model

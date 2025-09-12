@@ -125,6 +125,7 @@ def run_standard_training(agent, decision_type: str, config: Configuration, retu
                 pv_capa=config.PV_INSTALLED_CAPA,
                 year=9,
                 start_day=START,
+                config=config,
             )
             
             # Update learning rate if supported

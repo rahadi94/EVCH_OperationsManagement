@@ -16,9 +16,10 @@ class PricingService:
     Accesses Operator state via the provided reference.
     """
 
-    def __init__(self, operator: Any, agents_controller: Any | None = None):
+    def __init__(self, operator: Any, agents_controller: Any | None = None, config: Any = None):
         self.op = operator
         self.agents_controller = agents_controller
+        self.config = config
         
         # Register agents with the decision request system
         auto_register_agents(operator)
@@ -77,7 +78,7 @@ class PricingService:
             self.op.pricing_agent.state = pricing_state
             eval_ep = self.op.pricing_agent.do_evaluation_iterations
 
-            pricing_mode = Configuration.instance().pricing_mode
+            pricing_mode = self.config.pricing_mode if self.config else Configuration.instance().pricing_mode
             agent_name = self.op.pricing_agent.agent_name
 
             if pricing_mode == "Discrete":
@@ -112,7 +113,7 @@ class PricingService:
                 
                 rescaled_actions = self.op.pricing_agent.environment.rescale_action(self.op.pricing_agent.action)
 
-                config = Configuration.instance()
+                config = self.config if self.config else Configuration.instance()
                 if not config.dynamic_fix_term_pricing and config.capacity_pricing:
                     self.op.pricing_parameters[1] = rescaled_actions[0]
 
@@ -148,7 +149,7 @@ class PricingService:
                     "eval_ep": False,
                     "charging_hub": self.op.charging_hub,
                     "env": self.op.env,
-                    "pricing_mode": Configuration.instance().pricing_mode,
+                    "pricing_mode": self.config.pricing_mode if self.config else Configuration.instance().pricing_mode,
                     "current_demand": self.op.get_hub_load_kW(),
                     "grid_capacity": self.op.get_exp_free_grid_capacity().free_grid_capa_actual[0] if hasattr(self.op, 'free_grid_capa_actual') and len(self.op.free_grid_capa_actual) > 0 else 1000
                 }
@@ -296,7 +297,7 @@ class PricingService:
         # Create context for the decision request
         context = {
             "eval_ep": eval_ep,
-            "pricing_mode": Configuration.instance().pricing_mode,
+            "pricing_mode": self.config.pricing_mode if self.config else Configuration.instance().pricing_mode,
             "agent_name": self.op.pricing_agent.agent_name,
             "charging_hub": self.op.charging_hub,
             "env": self.op.env
@@ -343,14 +344,14 @@ class PricingService:
 
     def _update_tou_pricing(self) -> None:
         hour = self._get_current_hour()
-        max_price = Configuration.instance().max_price_ToU
+        max_price = self.config.max_price_ToU if self.config else Configuration.instance().max_price_ToU
         self.op.pricing_parameters[0] = (
             self.op.electricity_tariff[hour] / max(self.op.electricity_tariff) * max_price
         )
 
     def _update_perfect_info_pricing(self) -> None:
         hour = self._get_current_hour()
-        config = Configuration.instance()
+        config = self.config if self.config else Configuration.instance()
         if config.dynamic_fix_term_pricing:
             self.op.pricing_parameters[1] = self.op.price_schedules[1][hour]
             self.op.pricing_parameters[0] = self.op.price_schedules[0][hour]

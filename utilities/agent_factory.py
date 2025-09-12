@@ -33,14 +33,15 @@ def is_agent_learnable(agent_type: str) -> bool:
     return agent_type.upper() in learnable_types
 
 
-def create_agent(decision_type: str, agent_type: str, algorithm: Optional[str] = None, 
-                 strategy: Optional[str] = None):
+def create_agent(decision_type: str, agent_type: str, config: Configuration, 
+                 algorithm: Optional[str] = None, strategy: Optional[str] = None):
     """
     Create an agent based on decision type and agent type.
     
     Args:
         decision_type: Type of decision (pricing, charging, storage, routing)
         agent_type: Type of agent (RL_SAC, RULE_BASED, HEURISTIC, etc.)
+        config: Configuration instance
         algorithm: Algorithm name for heuristic agents
         strategy: Strategy name for agents that support different strategies
         
@@ -51,21 +52,21 @@ def create_agent(decision_type: str, agent_type: str, algorithm: Optional[str] =
         ValueError: If decision type or agent type is not supported
     """
     if decision_type == "pricing":
-        return _create_pricing_agent(agent_type, strategy)
+        return _create_pricing_agent(agent_type, config, strategy)
     elif decision_type == "charging":
-        return _create_charging_agent(agent_type, algorithm, strategy)
+        return _create_charging_agent(agent_type, config, algorithm, strategy)
     elif decision_type == "storage":
-        return _create_storage_agent(agent_type, algorithm, strategy)
+        return _create_storage_agent(agent_type, config, algorithm, strategy)
     elif decision_type == "routing":
-        return _create_routing_agent(agent_type, algorithm, strategy)
+        return _create_routing_agent(agent_type, config, algorithm, strategy)
     else:
         raise ValueError(f"Unsupported decision type: {decision_type}")
 
 
-def _create_pricing_agent(agent_type: str, strategy: Optional[str] = None):
+def _create_pricing_agent(agent_type: str, config: Configuration, strategy: Optional[str] = None):
     """Create a pricing agent."""
     if agent_type == "RL_SAC":
-        return _create_sac_pricing_agent()
+        return _create_sac_pricing_agent(config)
     elif agent_type == "HEURISTIC":
         strategy = strategy or "time_of_use"
         return RuleBasedPricingAgent(strategy=strategy)
@@ -75,7 +76,7 @@ def _create_pricing_agent(agent_type: str, strategy: Optional[str] = None):
         raise ValueError(f"Unsupported agent type for pricing: {agent_type}")
 
 
-def _create_charging_agent(agent_type: str, algorithm: Optional[str] = None, 
+def _create_charging_agent(agent_type: str, config: Configuration, algorithm: Optional[str] = None, 
                           strategy: Optional[str] = None):
     """Create a charging agent."""
     if agent_type == "HEURISTIC":
@@ -86,7 +87,7 @@ def _create_charging_agent(agent_type: str, algorithm: Optional[str] = None,
         raise ValueError(f"Unsupported agent type for charging: {agent_type}")
 
 
-def _create_storage_agent(agent_type: str, algorithm: Optional[str] = None, 
+def _create_storage_agent(agent_type: str, config: Configuration, algorithm: Optional[str] = None, 
                          strategy: Optional[str] = None):
     """Create a storage agent."""
     if agent_type == "HEURISTIC":
@@ -97,7 +98,7 @@ def _create_storage_agent(agent_type: str, algorithm: Optional[str] = None,
         raise ValueError(f"Unsupported agent type for storage: {agent_type}")
 
 
-def _create_routing_agent(agent_type: str, algorithm: Optional[str] = None, 
+def _create_routing_agent(agent_type: str, config: Configuration, algorithm: Optional[str] = None, 
                          strategy: Optional[str] = None):
     """Create a routing agent."""
     if agent_type == "HEURISTIC":
@@ -108,10 +109,8 @@ def _create_routing_agent(agent_type: str, algorithm: Optional[str] = None,
         raise ValueError(f"Unsupported agent type for routing: {agent_type}")
 
 
-def _create_sac_pricing_agent():
+def _create_sac_pricing_agent(config: Configuration):
     """Create and configure a SAC pricing agent."""
-    config = Configuration.instance()
-    
     # Configure pricing environment for RL agent
     pricing_config.number_chargers = config.facility_size
     pricing_config.maximum_power = 50
