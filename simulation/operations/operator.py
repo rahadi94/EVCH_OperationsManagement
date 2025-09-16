@@ -15,6 +15,7 @@ from simulation.operations.Operator_utils import compute_free_grid_capacity
 from simulation.operations.pricing_service import PricingService
 from simulation.operations.charging_service import ChargingService
 from simulation.operations.storage_service import StorageService
+from simulation.enums.vehicle_status import VehicleStatus
 from utilities.rl_environments.rl_pricing_env import convert_to_vector
 
 
@@ -780,7 +781,7 @@ class Operator:
         while True:
             self.get_exp_free_grid_capacity()
             self.get_available_battery_load()
-            connected_vehicles = [x for x in self.requests if x.mode == "Connected"]
+            connected_vehicles = [x for x in self.requests if x.mode == VehicleStatus.CONNECTED]
             if charging_strategy in ["perfect_info", "perfect_info_with_storage"]:
                 self.apply_charging_routing_storage_perfect_info(charging_strategy)
 
@@ -968,7 +969,7 @@ class Operator:
             # get charging load
             t = self.env.now
             ev_charging_load = sum(
-                [x.charging_power for x in self.requests if x.mode == "Connected"]
+                [x.charging_power for x in self.requests if x.mode == VehicleStatus.CONNECTED]
             )  # previously defined by charging algo
             # Here we use actuals but since is highly predictable it should be fine
             max_base_load = max(
@@ -1028,7 +1029,7 @@ class Operator:
 
         t = self.env.now
         charging_load = sum(
-            [x.charging_power for x in self.requests if x.mode == "Connected"]
+            [x.charging_power for x in self.requests if x.mode == VehicleStatus.CONNECTED]
         )
         baseload_max = max(
             self.baseload.loc[t : t + self.planning_interval - 1]["load_kw_rescaled"]
@@ -1052,7 +1053,7 @@ class Operator:
 
         t = self.env.now
         charging_load = sum(
-            [x.charging_power for x in self.requests if x.mode == "Connected"]
+            [x.charging_power for x in self.requests if x.mode == VehicleStatus.CONNECTED]
         )
         baseload_max = max(
             self.baseload.loc[t : t + self.planning_interval - 1]["load_kw_rescaled"]
@@ -1090,7 +1091,7 @@ class Operator:
 
         t = self.env.now
         charging_load = sum(
-            [x.charging_power for x in self.requests if x.mode == "Connected"]
+            [x.charging_power for x in self.requests if x.mode == VehicleStatus.CONNECTED]
         )
         baseload = self.baseload.loc[t]["load_kw_rescaled"]
 
@@ -1134,7 +1135,7 @@ class Operator:
                     x for x in not_arrived_requests if x.arrival_period <= self.env.now
                 ]
                 for request in requests:
-                    request.mode = "Arrived"
+                    request.mode = VehicleStatus.ARRIVED
                     if self.multiple_power:
                         request.adjust_request_demand_based_on_pricing(
                             self.price_pairs, self.pricing_parameters, self.parking_fee
@@ -1157,7 +1158,7 @@ class Operator:
         """
         lg.info(f"Request {request.id} arrived at {self.env.now}"
                 , extra={"clazz": self.__class__.__name__, "oid": ""})
-        request.mode = "Arrived"
+        request.mode = VehicleStatus.ARRIVED
 
         # get charger for request
         charging_station = self.get_routing_instructions(request=request)
@@ -1175,7 +1176,7 @@ class Operator:
                     # yield charging_req and parking_req
                     request.assigned_charger = charging_station
                     request.is_assigned = True
-                    request.mode = "Assigned"
+                    request.mode = VehicleStatus.ASSIGNED
                     lg.info(
                         f"Request {request.id} (EV={request.ev}; "
                         f"requested charge = {request.energy_requested} kW) assigned to charging station "
@@ -1184,7 +1185,7 @@ class Operator:
                     )
                     self.arrival_event.succeed()
                     self.arrival_event = self.env.event()
-                    request.mode = "Connected"
+                    request.mode = VehicleStatus.CONNECTED
                     request.assigned_time = self.env.now
                     request.waiting_time = (
                         request.assigned_time - request.arrival_period
@@ -1200,7 +1201,7 @@ class Operator:
                     # charging_req.cancel()
                     # self.parking_spots.release(parking_req)
                     # parking_req.cancel()
-                    request.mode = "Left"
+                    request.mode = VehicleStatus.LEFT
                     # request.assigned_charger = None
                     lg.info(
                         f"Request {request.id} got {request.energy_charged} with requested energy"
@@ -1215,9 +1216,9 @@ class Operator:
             with self.parking_spots.request() as req:
                 yield req
                 # lg.info(f'Request {request.id} starts parking')
-                request.mode = "Parking"
+                request.mode = VehicleStatus.PARKING
                 yield request.event_departure
-                request.mode = "Left"
+                request.mode = VehicleStatus.LEFT
 
     def storage_process(self):
         """
@@ -1253,11 +1254,11 @@ class Operator:
             # self.env.process(self.charging_parking_task(request))
             if Configuration.instance().remove_low_request_EVs:
                 if request.energy_requested == 0:
-                    request.mode = "Left"
+                    request.mode = VehicleStatus.LEFT
                     request.event_departure.succeed()
                     return
             if request.ev == 1:
-                if request.mode == "Connected":
+                if request.mode == VehicleStatus.CONNECTED:
                     # print(f'{request.id} is charging with power {request.charging_power}')
                     request.energy_charged += (
                         request.charging_power / 60
@@ -1268,13 +1269,13 @@ class Operator:
                             , extra={"clazz": self.__class__.__name__, "oid": ""}
                         )
                 if (
-                    request.mode == "Connected"
+                    request.mode == VehicleStatus.CONNECTED
                     and request.energy_charged >= request.energy_requested
                 ):
                     request.event_stop_charging.succeed()
                     request.event_stop_charging = self.env.event()
                     request.stop_charging_time = self.env.now
-                    request.mode = "Fully_charged"
+                    request.mode = VehicleStatus.FULLY_CHARGED
                     request.charging_power = 0
                     lg.info(f"Request {request.id} stopped charging at {self.env.now}"
                             , extra={"clazz": self.__class__.__name__, "oid": ""})
@@ -1302,7 +1303,7 @@ class Operator:
                 if request.energy_charged < 0:
                     lg.info(f"request.energy_charged is negative for {request.id}"
                             , extra={"clazz": self.__class__.__name__, "oid": ""})
-                request.mode = "Left"
+                request.mode = VehicleStatus.LEFT
                 request.event_departure.succeed()
                 return
             yield self.env.timeout(1)

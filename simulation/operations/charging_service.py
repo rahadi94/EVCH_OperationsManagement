@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 from simulation.operations.agents_controller import AgentsController
 from simulation.config_facade import ConfigFacade
+from simulation.enums.vehicle_status import VehicleStatus
 from .decision_request_system import DecisionType, decision_system
 from .decision_decorators import auto_register_agents
 
@@ -116,6 +117,9 @@ class ChargingService:
             # Apply charging actions (action[1:])
             action_index = 1  # Start from 1 because action[0] is for storage
             for charger in self.op.charging_hub.chargers:
+                # Update charger status to populate charging_vehicles
+                charger.status_update()
+                
                 for connector_idx in range(charger.number_of_connectors):
                     if action_index >= len(action):
                         break  # Prevent index error if action list is shorter than expected
@@ -123,14 +127,19 @@ class ChargingService:
                     charging_power = action[action_index]
                     if charging_power > 0:
                         charging_vehicles = charger.charging_vehicles
+                        print(f"Charging vehicles: {charging_vehicles}")
                         if connector_idx < len(charging_vehicles):
                             vehicle = charging_vehicles[connector_idx]
                             vehicle.charging_power = charging_power
+                            print(f"Vehicle {vehicle.id} charging power: {vehicle.charging_power}")
                     action_index += 1
         else:
             # For non-RL agents, use the original logic
             action_index = 1  # Start from 1 because action[0] is reserved
             for charger in self.op.charging_hub.chargers:
+                # Update charger status to populate charging_vehicles
+                charger.status_update()
+                
                 for connector_idx in range(charger.number_of_connectors):
                     if action_index >= len(action):
                         break
@@ -138,6 +147,7 @@ class ChargingService:
                     charging_power = action[action_index]
                     if charging_power > 0:
                         charging_vehicles = charger.charging_vehicles
+                        
                         if connector_idx < len(charging_vehicles):
                             vehicle = charging_vehicles[connector_idx]
                             vehicle.charging_power = charging_power

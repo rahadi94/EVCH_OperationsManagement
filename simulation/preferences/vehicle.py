@@ -3,6 +3,7 @@ import numpy as np
 
 from resources.configuration.configuration import Configuration
 from simulation.preferences.EV_user_decision_making import ev_decision_making
+from simulation.enums.vehicle_status import VehicleStatus
 import pandas as pd
 
 class Vehicle:
@@ -63,9 +64,7 @@ class Vehicle:
         self.charging_power = 0  # kW #evtl. this will become a list that gets updates for non-myopic algos
         self.charge_schedule = dict()
         self.battery_size = battery_size  # kwh
-        self.mode = (
-            None  # tracks mode of vehicle [parking, connected, charging, leaving]
-        )
+        self.mode = None  # tracks mode of vehicle using enum
         self.assigned_charger = None  # tracks charger request
         self.assigned_parking = None  # tracks parking request
         self.assigned_time = None

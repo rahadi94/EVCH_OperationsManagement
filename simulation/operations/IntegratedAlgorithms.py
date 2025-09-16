@@ -2,6 +2,7 @@ from resources.logging.log import lg
 from docplex.mp.model import Model
 import numpy as np
 from resources.configuration.configuration import Configuration
+from simulation.enums.vehicle_status import VehicleStatus
 
 
 # TODO: myopic and multi-period optimal routing and charging (as implemented in ICIS paper but with specified lookahead window (e.g., 8 planning periods, which is 2h))
@@ -43,7 +44,7 @@ def perfect_info_charging_routing(
     sub_vehicles = {}
     for j in charging_stations:
         CS_range.append(j.id)
-        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == "Connected"]
+        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         sub_vehicles_charging[j] = j.charging_vehicles
         sub_vehicles = j.connected_vehicles
     number_of_connectors = j.number_of_connectors
@@ -199,7 +200,7 @@ def perfect_info_charging_routing_storage(
     sub_vehicles = {}
     for j in charging_stations:
         CS_range.append(j.id)
-        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == "Connected"]
+        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         sub_vehicles_charging[j] = j.charging_vehicles
         sub_vehicles = j.connected_vehicles
     number_of_connectors = j.number_of_connectors

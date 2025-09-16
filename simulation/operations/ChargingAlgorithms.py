@@ -3,6 +3,7 @@ from docplex.mp.model import Model
 
 from resources.configuration.configuration import Configuration
 from resources.logging.log import lg
+from simulation.enums.vehicle_status import VehicleStatus
 
 
 # Uncontrolled charging (ignores all infrastructure)
@@ -380,7 +381,7 @@ def equal_sharing(
     num_charging_vehicles = 0
     num_active_chargers = 0
     for c in charging_stations:
-        c.charging_vehicles = [x for x in c.connected_vehicles if x.mode == "Connected"]
+        c.charging_vehicles = [x for x in c.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         if len(c.charging_vehicles) > 0:
             num_active_chargers += 1
             num_charging_vehicles += len(c.charging_vehicles)
@@ -396,11 +397,11 @@ def equal_sharing(
 
     for charger in charging_stations:
         number_of_charging_vehicles = len(
-            [x for x in charger.connected_vehicles if x.mode == "Connected"]
+            [x for x in charger.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         )
         if number_of_charging_vehicles > 0:
             number_of_charging_vehicles = len(
-                [x for x in charger.connected_vehicles if x.mode == "Connected"]
+                [x for x in charger.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
             )
             power = charger.available_power / number_of_charging_vehicles
             for vehicle in charger.connected_vehicles:
@@ -482,7 +483,7 @@ def online_myopic(
     sub_vehicles = {}
     for j in charging_stations:
         CS_range.append(j.id)
-        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == "Connected"]
+        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         sub_vehicles[j] = j.charging_vehicles
 
     l = (
@@ -557,7 +558,7 @@ def online_multi_period(
     sub_vehicles = {}
     for j in charging_stations:
         CS_range.append(j.id)
-        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == "Connected"]
+        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         sub_vehicles[j] = j.charging_vehicles
 
     # range of simulation (in planning periods, shorten if sim_end would be exceededs)
@@ -786,7 +787,7 @@ def integrated_charging_storage(
     sub_vehicles = {}
     for j in charging_stations:
         CS_range.append(j.id)
-        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == "Connected"]
+        j.charging_vehicles = [x for x in j.connected_vehicles if x.mode == VehicleStatus.CONNECTED]
         sub_vehicles[j] = j.charging_vehicles
 
     # range of simulation (in planning periods, shorten if sim_end would be exceededs)

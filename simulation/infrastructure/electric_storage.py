@@ -1,3 +1,6 @@
+from simulation.enums.vehicle_status import StorageStatus
+
+
 class ElectricStorage:
 
     def __init__(self, env, max_capacity_kWh, min_capacity_kWh=0, efficiency=1):
@@ -8,7 +11,7 @@ class ElectricStorage:
         self.charge_yn_plan = dict()
         self.discharge_yn = 0  # binary indicator of whether storage is being discharged
         self.discharge_yn_plan = dict()
-        self.mode = None  # "Charging", "Discharging", "Idle"
+        self.mode = StorageStatus.IDLE  # Storage status using enum
         self.charging_power = 0
         self.charging_power_plan = dict()
         self.discharging_power = 0
@@ -33,11 +36,11 @@ class ElectricStorage:
 
         # set mode
         if self.charge_yn == 1:
-            self.mode = "Charging"
+            self.mode = StorageStatus.CHARGING
         elif self.discharge_yn == 1:
-            self.mode = "Discharging"
+            self.mode = StorageStatus.DISCHARGING
         else:
-            self.mode = "Idle"
+            self.mode = StorageStatus.IDLE
         # charge rate cannot exceed Soc and grid capa
 
         if self.SoC > self.max_energy_stored_kWh:

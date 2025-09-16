@@ -2,6 +2,7 @@ import simpy
 from simpy import Container
 
 from resources.logging.log import lg
+from simulation.enums.vehicle_status import VehicleStatus, ChargerStatus
 
 
 class EVCharger:
@@ -18,6 +19,7 @@ class EVCharger:
         :param number_of_connectors:
         """
         self.min_free_time = None
+        self.mode = ChargerStatus.IDLE
         self.departure_times = []
         self.env = env
         self.id = id
@@ -48,7 +50,7 @@ class EVCharger:
         vehicle.assigned_charger = self.connectors.request()
         yield vehicle.assigned_charger
         self.connected_vehicles.append(vehicle)
-        vehicle.mode = "connected"
+        vehicle.mode = VehicleStatus.CONNECTED
         lg.info(
             f"Vehicle {vehicle.id} connects to charging_station {self.id} at {self.env.now}"
         )
@@ -72,7 +74,7 @@ class EVCharger:
             energy
         )  # release charge energy at end of period (will be re-assigned in new period!)
 
-        vehicle.mode = "Connected"
+        vehicle.mode = VehicleStatus.CONNECTED
         lg.info(
             f"Vehicle {vehicle.id} charges at charging_station {self.id} at {self.env.now}"
         )
@@ -86,7 +88,7 @@ class EVCharger:
         self.connectors.release(vehicle.assigned_charger)  # release the connector
         vehicle.assigned_charger = None  # remove charger request from vehicle class
 
-        vehicle.mode = "finished"
+        vehicle.mode = VehicleStatus.LEFT
         lg.info(
             f"Vehicle {vehicle.id} finishes charging at {self.env.now} with total {vehicle.energy_charged} kWh delivered"
         )
@@ -101,11 +103,16 @@ class EVCharger:
 
     def status_update(self):
         self.current_power_usage = 0
-        for vehicle in [x for x in self.connected_vehicles if x.mode == "Connected"]:
-            self.current_power_usage += vehicle.charging_power
-        self.charging_vehicles = [
-            x for x in self.connected_vehicles if x.mode == "Connected"
+        
+        # Include both ASSIGNED and CONNECTED vehicles as they can receive charging power
+        charging_eligible_vehicles = [
+            x for x in self.connected_vehicles 
+            if x.mode in [VehicleStatus.ASSIGNED, VehicleStatus.CONNECTED]
         ]
+        
+        for vehicle in charging_eligible_vehicles:
+            self.current_power_usage += vehicle.charging_power
+        self.charging_vehicles = charging_eligible_vehicles
         self.free_capacity = self.power - self.current_power_usage
         self.free_capacity_level = self.get_free_capacity_level()
         self.departure_times = [x.departure_period for x in self.connected_vehicles] + [
@@ -130,7 +137,8 @@ class EVCharger:
         self.info["Consumption"] = []
         while True:
             charging_vehicles = [
-                x for x in self.connected_vehicles if x.mode == "Connected"
+                x for x in self.connected_vehicles 
+                if x.mode in [VehicleStatus.ASSIGNED, VehicleStatus.CONNECTED]
             ]
             Num_charging = len(charging_vehicles)
             Num_connected = len(self.connected_vehicles)

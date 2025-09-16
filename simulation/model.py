@@ -3,6 +3,7 @@ from resources.logging.log import lg
 from simulation.infrastructure.grid import GridCapacity
 from simulation.infrastructure.parking_lot import ParkingLot
 from simulation.operations.operator import Operator
+from simulation.enums.vehicle_status import VehicleStatus
 import pandas as pd
 from simulation.infrastructure.ev_charger import EVCharger
 from simulation.infrastructure.electric_generator import NonDispatchableGenerator
@@ -1078,7 +1079,7 @@ class EVCC_Sim_Model:
                     * request.charging_price
                     * Configuration.instance().energy_missed_penalty
                 )
-            elif request.mode == "Left":
+            elif request.mode == VehicleStatus.LEFT:
                 total_revenue -= (
                     max(energy_requested_adj - request.energy_charged, 0)
                     * request.charging_price

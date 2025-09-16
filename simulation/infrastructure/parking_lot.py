@@ -1,6 +1,7 @@
 import simpy
 from simpy import Resource
 from resources.logging.log import lg
+from simulation.enums.vehicle_status import VehicleStatus
 
 
 class ParkingLot:
@@ -28,7 +29,7 @@ class ParkingLot:
         yield vehicle.assigned_parking  # yield the request
 
         self.parked_vehicles.append(vehicle)
-        vehicle.mode = "parking"
+        vehicle.mode = VehicleStatus.PARKING
         lg.info(f"Vehicle {vehicle.id} parks at {self.env.now}")
 
     def leave(self, vehicle):
@@ -40,7 +41,7 @@ class ParkingLot:
         self.parking_spots.release(vehicle.assigned_parking)  # release the parking spot
 
         self.parked_vehicles.remove(vehicle)
-        vehicle.mode = "leaving"
+        vehicle.mode = VehicleStatus.LEFT
         lg.info(f"Vehicle {vehicle.id} leaves at {self.env.now}")
 
     def monitor(self):
