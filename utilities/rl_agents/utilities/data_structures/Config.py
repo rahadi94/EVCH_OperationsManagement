@@ -23,6 +23,7 @@ class Config(object):
         self.learnt_network = False
         self.average_score_required_to_win = 0
         self.number_chargers = None
+        self.num_connector = None
         self.maximum_power = None
         self.number_power_options = None
         self.evaluation_after_training = False

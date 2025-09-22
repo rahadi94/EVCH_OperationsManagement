@@ -3,6 +3,7 @@ from gym import error, spaces, utils
 import numpy as np
 import logging
 import pandas as pd
+from simulation.operations.StorageAlgorithms import peak_shaving
 
 
 class ChargingEnv(gym.Env):
@@ -15,7 +16,7 @@ class ChargingEnv(gym.Env):
         self.action_space = spaces.Box(
             low=0,
             high=config.maximum_power,
-            shape=(config.number_chargers + 1,),
+            shape=(config.number_chargers + 1,), #TODO: this must be changed based on the number of connectors
             dtype=np.float64,
         )
         self.action_space.low[0] = 250
@@ -44,6 +45,10 @@ class ChargingEnv(gym.Env):
         )
         self.config = config
         self.action = None
+        self.action_range = [
+            self.action_space.low,
+            self.action_space.high,
+        ]
 
     def get_state(self, charging_hub=None, env=None):
         state = np.array([])
@@ -127,6 +132,7 @@ class ChargingEnv(gym.Env):
                     charger_state[j * 3 + 1] = vehicles[j].remaining_park_duration
                     charger_state[j * 3 + 2] = charger.id
                 state = np.append(state, charger_state)
+            self.state = state
         return state
 
     def step(self, action):
@@ -149,8 +155,18 @@ class ChargingEnv(gym.Env):
         obs = self._next_observation()
         return obs, reward, done, {}
 
-    def receive_action(self):
-        return self.action
+    def rescale_action(self, action):
+        return (
+            action * (self.action_range[1] - self.action_range[0]) / 2.0
+            + (self.action_range[1] + self.action_range[0]) / 2.0
+        )
+
+    def descale_action(self, action):
+
+        actions = (action - ((self.action_range[1] + self.action_range[0]) / 2.0)) / (
+            (self.action_range[1] - self.action_range[0]) / 2
+        )
+        return actions
 
     def reset(self):
         # Reset the state of the environment to an initial state
@@ -222,74 +238,87 @@ class ChargingEnv(gym.Env):
     
     def checked_action(self, action):
         """
-        Check and adjust charging actions for feasibility.
-        This method was moved from SAC.py to keep simulation logic in the environment.
+        Efficiently check and adjust charging actions for feasibility.
+        
+        Optimizations:
+        - Vectorized operations where possible
+        - Reduced redundant calculations
+        - Eliminated unnecessary loops
+        - Pre-computed constants
         """
         if not self.charging_hub:
             return action
             
-        vehicle_state = self.state[24 + 5 + 5 :] if hasattr(self, 'state') else []
-        ### check charging action
-        i = 0
+        # Pre-compute constants
+        planning_interval = self.charging_hub.planning_interval
+        time_factor = planning_interval / 60.0  # Convert minutes to hours
+        free_grid_capacity = self.charging_hub.operator.free_grid_capa_actual[0]
+        
+        # Get vehicle states efficiently
+        if hasattr(self, 'state') and len(self.state) > 7:
+            vehicle_states = self.state[7:].reshape(-1, 3)  # Skip time + 5 hub states
+        else:
+            vehicle_states = np.array([]).reshape(0, 3)
+        
+        # 1. Check vehicle energy requirements and set zero actions for fully charged vehicles
+        action_idx = 1  # Start from index 1 (index 0 is storage)
+        vehicle_state_idx = 0  # Track vehicle state index separately
+        
         for charger in self.charging_hub.chargers:
-            lower_bound = i + 1
-            for j in range(charger.number_of_connectors):
-                maximum_power = charger.power
-                if i * 3 < len(vehicle_state) and vehicle_state[i * 3] <= 0:
-                    if i + 1 < len(action):
-                        action[i + 1] = 0
-                i += 1
-            upper_bound = min(i + 1, len(action))
-
-            while action[lower_bound:upper_bound].sum() > maximum_power:
-                number_active_chargers = len(
-                    [f for f in action[lower_bound:upper_bound] if f > 0]
-                )
-                surplus_per_charger = (
-                    max(action[lower_bound:upper_bound].sum() - maximum_power, 0)
-                    / number_active_chargers
-                )
-                action[lower_bound:upper_bound] -= surplus_per_charger
-                for c in range(len(action[lower_bound:upper_bound])):
-                    action[lower_bound:upper_bound][c] = max(
-                        action[lower_bound:upper_bound][c], 0
-                    )
-
-        storage_object = self.charging_hub.electric_storage
-        storage_object.SoC = min(
-            storage_object.SoC, storage_object.max_energy_stored_kWh
-        )
-        storage_object.SoC = max(storage_object.SoC, 0)
-        if action[0] >= 0:
-            if (
-                storage_object.SoC + action[0] / 60 * self.charging_hub.planning_interval
-                > storage_object.max_energy_stored_kWh
-            ):
-                action[0] = (
-                    storage_object.max_energy_stored_kWh - storage_object.SoC
-                ) / (60 * self.charging_hub.planning_interval)
-            action[0] = min(action[0], self.charging_hub.operator.free_grid_capa_actual[0])
-
-        # discharge rate cannot exceed SoC, and hub demand (i.e., no infeed)
-        if action[0] < 0:
-            if storage_object.SoC <= 0:
+            for connector_idx in range(charger.number_of_connectors):
+                if action_idx < len(action):
+                    # Check if there's a vehicle at this connector and if it's fully charged
+                    if (vehicle_state_idx < len(vehicle_states) and 
+                        vehicle_states[vehicle_state_idx, 0] <= 0):  # energy_deficit <= 0
+                        action[action_idx] = 0
+                    vehicle_state_idx += 1
+                action_idx += 1
+        
+        # 2. Enforce charger power limits efficiently
+        action_idx = 1
+        for charger in self.charging_hub.chargers:
+            start_idx = action_idx
+            end_idx = action_idx + charger.number_of_connectors
+            end_idx = min(end_idx, len(action))
+            
+            if start_idx < end_idx:
+                charger_actions = action[start_idx:end_idx]
+                total_power = charger_actions.sum()
+                
+                if total_power > charger.power:
+                    # Scale down proportionally
+                    scale_factor = charger.power / total_power
+                    action[start_idx:end_idx] *= scale_factor
+            
+            action_idx = end_idx
+        
+        # 3. Handle storage constraints efficiently
+        storage = self.charging_hub.electric_storage
+        
+        # Clamp SoC to valid range
+        storage.SoC = np.clip(storage.SoC, 0, storage.max_energy_stored_kWh)
+        
+        if action[0] >= 0:  # Charging
+            # Check storage capacity limit
+            max_charge_power = (storage.max_energy_stored_kWh - storage.SoC) / time_factor
+            action[0] = min(action[0], max_charge_power, free_grid_capacity)
+        else:  # Discharging
+            if storage.SoC <= 0:
                 action[0] = 0
-            elif (
-                storage_object.SoC + (action[0] / 60 * self.charging_hub.planning_interval)
-                < 0
-            ):
-                action[0] = -max(
-                    (storage_object.SoC) / (60 * self.charging_hub.planning_interval), 0
-                )
+            else:
+                # Check SoC limit
+                max_discharge_power = storage.SoC / time_factor
+                action[0] = max(action[0], -max_discharge_power)
+        
+        # 4. Enforce total grid capacity constraint efficiently
+        total_demand = action.sum()
+        if total_demand > free_grid_capacity:
+            # Scale down all charging actions proportionally
+            scale_factor = free_grid_capacity / total_demand
+            action *= scale_factor
+            
+            # Ensure no negative values
+            action = np.maximum(action, 0)
 
-        while action.sum() - self.charging_hub.operator.free_grid_capa_actual[0] > 0:
-            number_active_chargers = len([a for a in action if a > 0])
-            surplus_per_charger = (
-                max(action.sum() - self.charging_hub.operator.free_grid_capa_actual[0], 0)
-                / number_active_chargers
-            )
-            for i in range(1, len(action)):
-                action[i] = max(action[i] - surplus_per_charger, 0)
-            # if action[0]>0:
-            #     action[0] = max(action[0] - surplus_per_charger, 0)
+        
         return action

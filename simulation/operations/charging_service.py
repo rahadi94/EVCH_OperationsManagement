@@ -100,7 +100,7 @@ class ChargingService:
             if hasattr(self.op.charging_agent, 'rescale_action'):
                 action = self.op.charging_agent.rescale_action(action)
             
-            # For RL agents, use the environment's checked_action method to ensure feasibility
+            # # For RL agents, use the environment's checked_action method to ensure feasibility
             if hasattr(self.op.charging_agent.environment, 'checked_action'):
                 action = self.op.charging_agent.environment.checked_action(action)
             
@@ -126,12 +126,11 @@ class ChargingService:
 
                     charging_power = action[action_index]
                     if charging_power > 0:
-                        charging_vehicles = charger.charging_vehicles
-                        print(f"Charging vehicles: {charging_vehicles}")
+                        charging_vehicles = charger.connected_vehicles
                         if connector_idx < len(charging_vehicles):
                             vehicle = charging_vehicles[connector_idx]
                             vehicle.charging_power = charging_power
-                            print(f"Vehicle {vehicle.id} charging power: {vehicle.charging_power}")
+ 
                     action_index += 1
         else:
             # For non-RL agents, use the original logic

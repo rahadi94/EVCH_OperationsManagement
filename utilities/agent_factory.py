@@ -181,6 +181,7 @@ def _create_sac_charging_agent(config: Configuration):
     
     # Configure charging environment parameters
     charging_config.number_chargers = config.facility_size
+    charging_config.num_connector = config.num_connector
     charging_config.maximum_power = 50  # Maximum power per charger
     charging_config.maximum_grid_usage = config.grid_capa if hasattr(config, 'grid_capa') else 2000
     
