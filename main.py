@@ -132,13 +132,20 @@ def run_experiments(config: Configuration = None):
         
         # Prepare results parameters for single simulation
         results_params = [f"{getattr(config, 'POST_FIX', 'sim')}", f"state{9}", f"week{1}"]
+        chargers = {
+            "fast_one": config.CHARGER_NUM[0],
+            "fast_two": config.CHARGER_NUM[1],
+            "fast_four": config.CHARGER_NUM[2],
+            "slow_one": config.CHARGER_NUM[3],
+            "slow_two": config.CHARGER_NUM[4],
+            "slow_four": config.CHARGER_NUM[5],
+        }
         
         run_single_simulation(
             charging_agent=agents.get("charging"),
             storage_agent=agents.get("storage"),
             pricing_agent=agents.get("pricing"),
-            num_charger={"fast_one": config.facility_size, "fast_two": 0, "fast_four": 0, 
-                        "slow_one": 0, "slow_two": 0, "slow_four": 0},
+            num_charger=chargers,
             turn_off_monitoring=False,
             turn_on_results=results_params,  # Pass list instead of boolean
             turn_on_plotting=True,

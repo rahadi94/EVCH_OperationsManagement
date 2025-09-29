@@ -16,7 +16,7 @@ class ChargingEnv(gym.Env):
         self.action_space = spaces.Box(
             low=0,
             high=config.maximum_power,
-            shape=(config.number_chargers + 1,), #TODO: this must be changed based on the number of connectors
+            shape=(config.num_connector + 1,), #TODO: this must be changed based on the number of connectors
             dtype=np.float64,
         )
         self.action_space.low[0] = 250

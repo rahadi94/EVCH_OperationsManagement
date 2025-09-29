@@ -81,12 +81,12 @@ def run_standard_training(agent, decision_type: str, config: Configuration, retu
         
         # Charger configuration
         chargers = {
-            "fast_one": config.facility_size,
-            "fast_two": 0,
-            "fast_four": 0,
-            "slow_one": 0,
-            "slow_two": 0,
-            "slow_four": 0,
+            "fast_one": config.CHARGER_NUM[0],
+            "fast_two": config.CHARGER_NUM[1],
+            "fast_four": config.CHARGER_NUM[2],
+            "slow_one": config.CHARGER_NUM[3],
+            "slow_two": config.CHARGER_NUM[4],
+            "slow_four": config.CHARGER_NUM[5],
         }
         
         # Check if evaluation is needed

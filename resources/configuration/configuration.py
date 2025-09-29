@@ -333,7 +333,7 @@ class Configuration:
             "slow_two": self.CHARGER_NUM[4],
             "slow_four": self.CHARGER_NUM[5],
         }
-        self.MAX_NUM_CONNECTORS = parser_main.getint("INFRASTRUCTURE", "num_connector")
+        self.MAX_NUM_CONNECTORS = self.CHARGERS["fast_one"] + self.CHARGERS["fast_two"] * 2 + self.CHARGERS["fast_four"] * 4 + self.CHARGERS["slow_one"] + self.CHARGERS["slow_two"] * 2 + self.CHARGERS["slow_four"] * 4
         self.CHARGER_CAPA_FAST = parser_main.getint("INFRASTRUCTURE", "charger_power_fast")
         self.CHARGER_CAPA_SLOW = parser_main.getint("INFRASTRUCTURE", "charger_power_slow")
         self.CHARGER_CAPA = {"fast": self.CHARGER_CAPA_FAST, "slow": self.CHARGER_CAPA_SLOW}
